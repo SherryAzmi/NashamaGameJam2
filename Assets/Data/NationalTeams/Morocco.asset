@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Morocco
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Morocco
+  countryCode: MAR
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
-  preferredFormation: 4-3-3
-  playStyle: Balanced
+  attack: 82
+  midfield: 81
+  defense: 80
+  goalkeeper: 82
+  chemistry: 84
+  preferredFormation: 4-2-3-1
+  playStyle: Counter Attack

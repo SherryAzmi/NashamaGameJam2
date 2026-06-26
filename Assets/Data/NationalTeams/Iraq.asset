@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Iraq
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Iraq
+  countryCode: IRQ
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
+  attack: 69
+  midfield: 68
+  defense: 67
+  goalkeeper: 69
+  chemistry: 73
   preferredFormation: 4-3-3
   playStyle: Balanced

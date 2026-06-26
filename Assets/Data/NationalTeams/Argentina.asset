@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Argentina
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Argentina
+  countryCode: ARG
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
+  attack: 90
+  midfield: 88
+  defense: 84
+  goalkeeper: 88
+  chemistry: 90
   preferredFormation: 4-3-3
-  playStyle: Balanced
+  playStyle: Possession

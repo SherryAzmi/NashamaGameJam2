@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Japan
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Japan
+  countryCode: JPN
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
-  preferredFormation: 4-3-3
-  playStyle: Balanced
+  attack: 79
+  midfield: 80
+  defense: 76
+  goalkeeper: 78
+  chemistry: 82
+  preferredFormation: 4-2-3-1
+  playStyle: Possession
