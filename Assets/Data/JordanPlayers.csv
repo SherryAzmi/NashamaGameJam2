@@ -1,0 +1,88 @@
+Name,Club,Speed,Shoot,Defense,nationality,Category,Position
+Abdallah Al Fakhouri,Al Wehdat,50,20,82,Jordan,Local,GK
+Yousef Abu Jalboush,Al Wehdat,76,55,68,Jordan,Local,RB
+Salem Al Ajaleen,Al Wehdat,68,45,78,Jordan,Local,LB
+Mohammad Al Damiri,Al Wehdat,58,35,80,Jordan,Local,CB
+Feras Shelbaieh,Al Wehdat,66,48,72,Jordan,Local,CB
+Ibrahim Sadeh,Al Wehdat,75,62,68,Jordan,Local,CM
+Khaled Essam,Al Wehdat,72,60,64,Jordan,Local,CM
+Mohammad Abu Zraiq,Al Wehdat,84,70,42,Jordan,Local,LW
+Ahmad Al Arsan,Al Wehdat,82,72,40,Jordan,Local,RW
+Mahmoud Jamous,Al Wehdat,78,76,38,Jordan,Local,ST
+Anas Al Awdat,Al Wehdat,74,68,50,Jordan,Local,CAM
+
+Mohammad Abu Laila,Al Faisaly,52,20,84,Jordan,Local,GK
+Ahmad Samir,Al Faisaly,76,66,56,Jordan,Local,CAM
+Abdallah Nasib,Al Faisaly,60,35,82,Jordan,Local,CB
+Anas Bani Yaseen,Al Faisaly,56,38,80,Jordan,Local,CB
+Hadi Al Houri,Al Faisaly,73,48,72,Jordan,Local,LB
+Rajai Ayed,Al Faisaly,69,56,76,Jordan,Local,DM
+Ahmad Ersan,Al Faisaly,85,76,42,Jordan,Local,RW
+Yazan Al Bakheet,Al Faisaly,83,72,40,Jordan,Local,LW
+Aref Al Haj,Al Faisaly,71,54,68,Jordan,Local,CM
+Ahmad Hayel,Al Faisaly,68,72,36,Jordan,Local,ST
+Omar Al Kurdi,Al Faisaly,74,65,55,Jordan,Local,CM
+
+Ibrahim Al Zoubi,Al Hussein Irbid,55,20,82,Jordan,Local,GK
+Yazan Al Arab,Al Hussein Irbid,73,45,84,Jordan,Local,CB
+Bara Marei,Al Hussein Irbid,70,52,72,Jordan,Local,CB
+Nour Al Rawabdeh,Al Hussein Irbid,72,58,74,Jordan,Local,CM
+Bassam Al Rasan,Al Hussein Irbid,78,70,62,Jordan,Local,CM
+Saleh Ratib,Al Hussein Irbid,73,64,66,Jordan,Local,CM
+Laith Al Bustami,Al Hussein Irbid,77,63,54,Jordan,Local,RW
+Mahmoud Al Mardi,Al Hussein Irbid,82,77,44,Jordan,Local,LW
+Omar Hani,Al Hussein Irbid,80,69,46,Jordan,Local,RW
+Yazan Al Naimat,Al Hussein Irbid,84,80,38,Jordan,Local,ST
+Ali Olwan,Al Hussein Irbid,81,73,42,Jordan,Local,ST
+
+Ibrahim Al Zoubi,Al Ramtha,56,20,80,Jordan,Local,GK
+Hamza Al Dardour,Al Ramtha,73,74,34,Jordan,Local,ST
+Ahmad Al Sarhan,Al Ramtha,74,60,58,Jordan,Local,CM
+Yousef Al Rawashdeh,Al Ramtha,77,61,52,Jordan,Local,LW
+Mohammad Al Daoud,Al Ramtha,75,62,50,Jordan,Local,RW
+Fares Al Khair,Al Ramtha,68,52,70,Jordan,Local,CB
+Oday Al Zubi,Al Ramtha,66,45,74,Jordan,Local,CB
+Khaled Al Shalabi,Al Ramtha,71,48,72,Jordan,Local,LB
+Sami Al Khateeb,Al Ramtha,72,50,68,Jordan,Local,RB
+Mahmoud Al Omari,Al Ramtha,69,58,64,Jordan,Local,CM
+Rakan Al Shraideh,Al Ramtha,70,55,65,Jordan,Local,DM
+
+Mohammad Abu Laila,Al Jazeera,55,20,82,Jordan,Local,GK
+Omar Hani,Al Jazeera,80,68,44,Jordan,Local,RW
+Ahmad Al Sarhan,Al Jazeera,73,58,55,Jordan,Local,CM
+Laith Khroob,Al Jazeera,74,60,56,Jordan,Local,CM
+Fahad Al Yaseen,Al Jazeera,71,56,60,Jordan,Local,CM
+Khaled Al Assadi,Al Jazeera,68,48,72,Jordan,Local,CB
+Mohammad Al Hashahesh,Al Jazeera,74,60,66,Jordan,Local,CB
+Yazan Al Najjar,Al Jazeera,78,67,42,Jordan,Local,ST
+Mahmoud Jamous,Al Jazeera,81,66,40,Jordan,Local,LW
+Anas Al Khb,Al Jazeera,79,66,54,Jordan,Local,RW
+Hadi Al Houri,Al Jazeera,72,46,70,Jordan,Local,LB
+
+Ahmad Al Refaei,Al Salt,54,20,80,Jordan,Local,GK
+Mohammad Al Hashahesh,Al Salt,76,62,64,Jordan,Local,CM
+Khaled Al Assadi,Al Salt,69,50,72,Jordan,Local,CB
+Feras Al Ajarmeh,Al Salt,73,57,60,Jordan,Local,CM
+Yazan Al Najjar,Al Salt,77,66,44,Jordan,Local,ST
+Rami Al Shawabkeh,Al Salt,75,60,55,Jordan,Local,RW
+Mahmoud Al Qudah,Al Salt,74,61,54,Jordan,Local,LW
+Ayman Al Khawaldeh,Al Salt,68,45,74,Jordan,Local,CB
+Sultan Al Zaben,Al Salt,70,48,72,Jordan,Local,LB
+Omar Al Ajarmeh,Al Salt,71,50,68,Jordan,Local,RB
+Bilal Al Zuabi,Al Salt,72,58,66,Jordan,Local,DM
+
+Musa Al Taamari,Stade Rennais,91,82,35,Jordan,Abroad,RW
+Yazan Al Naimat,Al Ahli Qatar,84,80,38,Jordan,Abroad,ST
+Ali Olwan,Selangor FC,81,74,42,Jordan,Abroad,ST
+Yazan Al Arab,Al Shorta Iraq,73,45,84,Jordan,Abroad,CB
+Mohannad Abu Taha,Al Kholood,80,68,45,Jordan,Abroad,LW
+Sharara,Al Ahli Libya,79,70,48,Jordan,Abroad,RW
+Ihsan Haddad,Al Faisaly Kuwait,77,60,72,Jordan,Abroad,RB
+Nizar Al Rashdan,Al Arabi Kuwait,72,58,70,Jordan,Abroad,CM
+Mohammad Abu Hasheesh,Al Shorta Iraq,68,50,76,Jordan,Abroad,CB
+Ammar Al Taamari,AEL Limassol,78,62,55,Jordan,Abroad,CM
+Abdallah Al Attar,Al Nejmeh Lebanon,76,65,50,Jordan,Abroad,LW
+Saad Al Rosan,Kazma SC,74,60,64,Jordan,Abroad,CM
+Omar Hani,Al Karkh Iraq,80,68,44,Jordan,Abroad,RW
+Baha Faisal,Al Shahaniya Qatar,77,72,42,Jordan,Abroad,ST
+Mohammad Abu Zraiq,Al Sailiya Qatar,84,70,40,Jordan,Abroad,LW
