@@ -10,7 +10,7 @@ public class ChooseSceneController : MonoBehaviour
         if (userNameText != null)
         {
             string playerName = PlayerPrefs.GetString("PlayerName", string.Empty);
-            userNameText.text = $"Welcome , {playerName} !";
+            userNameText.text = $"{playerName}";
         }
     }
 }

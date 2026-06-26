@@ -5,6 +5,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class TrainingManager : MonoBehaviour
 {
+    private static TrainingManager instance;
+
     private const int MaxIndividualSlots = 2;
     private const int MaxPlayerBonus = 4;
     private const int MaxUnitBonus = 6;
@@ -44,6 +46,10 @@ public class TrainingManager : MonoBehaviour
 
     private float realTimeAccumulator;
 
+    // A job runs only after the player explicitly starts training.
+    // This prevents an old serialized job from running when opening HomeScene.
+    private bool trainingStartedByPlayer = false;
+
     public event Action OnTrainingStateChanged;
 
     public int DevelopmentPoints => developmentPoints;
@@ -67,45 +73,48 @@ public class TrainingManager : MonoBehaviour
         }
     }
 
- private void Awake()
-{
-    ResolveTeamManager();
-    ResetActiveTrainingForNewPlay();
-}
-[RuntimeInitializeOnLoadMethod(
-    RuntimeInitializeLoadType.BeforeSceneLoad
-)]
-private static void ResetOldTrainingManagersBeforePlay()
-{
-    TrainingManager[] managers =
-        FindObjectsByType<TrainingManager>(
-            FindObjectsInactive.Include,
-            FindObjectsSortMode.None
-        );
-
-    foreach (TrainingManager manager in managers)
+    private void Awake()
     {
-        manager.ResetActiveTrainingForNewPlay();
-    }
-}
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
 
-private void ResetActiveTrainingForNewPlay()
-{
-    currentGameHour = 8;
-    realTimeAccumulator = 0f;
+        instance = this;
+        DontDestroyOnLoad(gameObject);
 
-    if (individualJobs == null)
-    {
-        individualJobs = new List<TrainingJob>();
-    }
-    else
-    {
-        individualJobs.Clear();
+        ResolveTeamManager();
+
+        // This runs once when a brand-new Play session begins.
+        // It does NOT run while moving between Home, Formation, and Training.
+        ResetActiveTrainingForNewPlay();
     }
 
-    collectiveJob = null;
-}
+    [RuntimeInitializeOnLoadMethod(
+        RuntimeInitializeLoadType.SubsystemRegistration
+    )]
+    private static void ResetStaticInstance()
+    {
+        instance = null;
+    }
+    private void ResetActiveTrainingForNewPlay()
+    {
+        currentGameHour = 8;
+        realTimeAccumulator = 0f;
+        trainingStartedByPlayer = false;
 
+        if (individualJobs == null)
+        {
+            individualJobs = new List<TrainingJob>();
+        }
+        else
+        {
+            individualJobs.Clear();
+        }
+
+        collectiveJob = null;
+    }
     private void Start()
     {
         EnsurePlayerStates();
@@ -115,9 +124,15 @@ private void ResetActiveTrainingForNewPlay()
 
     private void Update()
     {
-        if (!HasActiveTraining)
+        if (!trainingStartedByPlayer || !HasActiveTraining)
         {
             realTimeAccumulator = 0f;
+
+            if (!HasActiveTraining)
+            {
+                trainingStartedByPlayer = false;
+            }
+
             return;
         }
 
@@ -197,7 +212,12 @@ private void ResetActiveTrainingForNewPlay()
             NotifyTrainingStateChanged();
         }
     }
-
+    // Called after the player confirms a NEW 26-player squad.
+    public void ClearOldTrainingForNewSquad()
+    {
+        ResetActiveTrainingForNewPlay();
+        NotifyTrainingStateChanged();
+    }
     public TrainingPreview GetTrainingPreview(
         PlayerData player,
         TrainingType type
@@ -250,6 +270,7 @@ private void ResetActiveTrainingForNewPlay()
             return false;
         }
 
+        trainingStartedByPlayer = true;
         developmentPoints -= validatedPreview.cost;
 
         TrainingJob job = new TrainingJob

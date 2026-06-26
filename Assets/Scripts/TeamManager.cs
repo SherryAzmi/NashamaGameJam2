@@ -144,7 +144,17 @@ private static TeamManager instance;
             Debug.Log(player.playerName + " - " + player.position);
         }
 
-        SceneManager.LoadScene("CampaignScene");
+        // A newly confirmed national squad starts with no previous training job.
+        TrainingManager trainingManager =
+            FindFirstObjectByType<TrainingManager>();
+
+        if (trainingManager != null)
+        {
+            trainingManager.ClearOldTrainingForNewSquad();
+        }
+
+        GameProgressManager.Instance.MarkTeamSelected();
+        SceneManager.LoadScene("HomeScene");
     }
 
     void UpdateConfirmButton()
