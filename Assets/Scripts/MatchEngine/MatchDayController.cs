@@ -1,11 +1,15 @@
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Lives in MatchDayScene. Reads the MatchSetup handed off by MatchLauncher,
 // shows a pre-kickoff comparison screen, then on "Kick Off" runs the
-// simulation and plays it back live on the pitch.
+// simulation and plays it back live on the pitch. Pauses automatically at
+// half-time, where the manager can either continue straight to the 2nd
+// half or open the real formation editor (loaded additively on top, so
+// nothing about this match's progress is lost) before continuing.
 public class MatchDayController : MonoBehaviour
 {
     [Header("Preview panel")]
@@ -27,9 +31,22 @@ public class MatchDayController : MonoBehaviour
     public TMP_Text eventLogText;
     public int maxLogLines = 8;
 
+    [Header("Half-time panel")]
+    public GameObject halfTimePanel;
+    public TMP_Text halfTimeScoreText;
+    public Button editFormationButton;
+    public Button startSecondHalfButton;
+
+    [Header("Scene roots (disabled during the additive formation edit)")]
+    public Canvas matchCanvas;
+    public Camera matchCamera;
+    public GameObject matchEventSystem;
+
     [Header("Result panel")]
     public GameObject resultPanel;
     public TMP_Text resultText;
+    public Button continueButton;
+    public string campaignSceneName = "CampaignScene";
 
     [Header("Systems")]
     public MatchPitchController pitchController;
@@ -38,7 +55,7 @@ public class MatchDayController : MonoBehaviour
     public MatchPenaltyController penaltyController;
 
     [Header("Knockout")]
-    [Tooltip("If true and the score is level at full time, this match goes to a penalty shootout instead of ending in a draw. CampaignManager (Dev A, future) should set this for knockout/final matches.")]
+    [Tooltip("Overridden by MatchSession.PendingIsKnockout when launched from the campaign hub's Final fixture. This Inspector value is only used as a fallback when testing this scene directly.")]
     public bool isKnockoutMatch;
 
     [Header("Speed")]
@@ -49,6 +66,7 @@ public class MatchDayController : MonoBehaviour
     private MatchSetup setup;
     private int homeScore;
     private int awayScore;
+    private bool? penaltyHomeWon;
     private readonly System.Collections.Generic.List<string> logLines = new System.Collections.Generic.List<string>();
     private readonly System.Collections.Generic.List<GoalEvent> liveGoals = new System.Collections.Generic.List<GoalEvent>();
 
@@ -62,10 +80,34 @@ public class MatchDayController : MonoBehaviour
             return;
         }
 
+        isKnockoutMatch = MatchSession.GetOrCreate().ConsumePendingIsKnockout() || isKnockoutMatch;
+
         ShowPreview();
 
         kickOffButton.onClick.RemoveAllListeners();
         kickOffButton.onClick.AddListener(KickOff);
+
+        continueButton.onClick.RemoveAllListeners();
+        continueButton.onClick.AddListener(ReturnToCampaign);
+
+        editFormationButton.onClick.RemoveAllListeners();
+        editFormationButton.onClick.AddListener(EditFormationAtHalftime);
+
+        startSecondHalfButton.onClick.RemoveAllListeners();
+        startSecondHalfButton.onClick.AddListener(StartSecondHalf);
+
+        halfTimePanel.SetActive(false);
+    }
+
+    private void ReturnToCampaign()
+    {
+        if (CampaignState.Instance != null)
+        {
+            bool homeWon = penaltyHomeWon ?? (homeScore > awayScore);
+            CampaignState.Instance.RecordResult(homeScore, awayScore, homeWon);
+        }
+
+        SceneManager.LoadScene(campaignSceneName);
     }
 
     private void OnEnable()
@@ -75,6 +117,8 @@ public class MatchDayController : MonoBehaviour
         MatchEvents.OnInjury += HandleInjury;
         MatchEvents.OnMinuteTick += HandleMinuteTick;
         MatchEvents.OnMatchEnd += HandleMatchEnd;
+        MatchEvents.OnHalfTime += HandleHalfTime;
+        MatchEvents.OnHalftimeEditComplete += HandleHalftimeEditComplete;
     }
 
     private void OnDisable()
@@ -84,6 +128,8 @@ public class MatchDayController : MonoBehaviour
         MatchEvents.OnInjury -= HandleInjury;
         MatchEvents.OnMinuteTick -= HandleMinuteTick;
         MatchEvents.OnMatchEnd -= HandleMatchEnd;
+        MatchEvents.OnHalfTime -= HandleHalfTime;
+        MatchEvents.OnHalftimeEditComplete -= HandleHalftimeEditComplete;
     }
 
     private void Update()
@@ -140,6 +186,7 @@ public class MatchDayController : MonoBehaviour
 
         homeScore = 0;
         awayScore = 0;
+        penaltyHomeWon = null;
         logLines.Clear();
         liveGoals.Clear();
         UpdateScoreText();
@@ -151,6 +198,56 @@ public class MatchDayController : MonoBehaviour
 
         playbackController.PlayMatch(result);
         decisiveMomentController.BeginMatch(setup);
+    }
+
+    private void HandleHalfTime()
+    {
+        decisiveMomentController.PauseForHalftime();
+
+        halfTimeScoreText.text = $"HALF TIME\n\nJORDAN {homeScore} - {awayScore} {setup.away.teamName.ToUpperInvariant()}";
+        halfTimePanel.SetActive(true);
+    }
+
+    private void StartSecondHalf()
+    {
+        halfTimePanel.SetActive(false);
+        FlipSidesAndResume();
+    }
+
+    private void EditFormationAtHalftime()
+    {
+        matchCanvas.enabled = false;
+        matchCamera.enabled = false;
+        matchEventSystem.SetActive(false);
+
+        MatchSession.GetOrCreate().SetHalftimeEditing(true);
+        SceneManager.LoadScene("FormationScene", LoadSceneMode.Additive);
+    }
+
+    private void HandleHalftimeEditComplete()
+    {
+        matchCanvas.enabled = true;
+        matchCamera.enabled = true;
+        matchEventSystem.SetActive(true);
+
+        halfTimePanel.SetActive(false);
+        FlipSidesAndResume();
+    }
+
+    private void FlipSidesAndResume()
+    {
+        TeamManager teamManager = FindFirstObjectByType<TeamManager>();
+
+        if (teamManager != null)
+        {
+            setup.home = MatchSetupBuilder.BuildRatings("Jordan", teamManager.startingEleven);
+        }
+
+        pitchController.SetSecondHalf();
+        pitchController.Setup(setup);
+
+        decisiveMomentController.ResumeFromHalftime();
+        playbackController.Resume();
     }
 
     private void HandleGoal(GoalEvent goalEvent)
@@ -207,6 +304,7 @@ public class MatchDayController : MonoBehaviour
 
     private void ShowFullTimeResultAfterPenalties(int penaltyHomeScore, int penaltyAwayScore)
     {
+        penaltyHomeWon = penaltyHomeScore > penaltyAwayScore;
         ShowFullTimeResult($"\nPENALTIES: {penaltyHomeScore} - {penaltyAwayScore}");
     }
 
@@ -216,9 +314,12 @@ public class MatchDayController : MonoBehaviour
 
         string motmName = FindManOfTheMatch();
 
+        // Bonus points are tracked (decisiveMomentController.TotalBonusPoints)
+        // but intentionally not shown here - the points system is being
+        // rebuilt separately and will hook into that value once ready.
         resultText.text =
             $"FULL TIME\n\nJORDAN {homeScore} - {awayScore} {setup.away.teamName.ToUpperInvariant()}{penaltyLine}\n\n" +
-            $"MAN OF THE MATCH: {motmName}\nBONUS POINTS: {decisiveMomentController.TotalBonusPoints}";
+            $"MAN OF THE MATCH: {motmName}";
     }
 
     private string FindManOfTheMatch()

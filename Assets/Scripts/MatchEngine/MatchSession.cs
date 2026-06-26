@@ -9,6 +9,19 @@ public class MatchSession : MonoBehaviour
 
     public MatchSetup PendingSetup { get; private set; }
 
+    // Set by the campaign hub before loading FormationScene, so MatchLauncher
+    // knows which national team this fixture is against.
+    public NationalTeamData PendingOpponentTeam { get; private set; }
+
+    // Set by the campaign hub when launching the Final - tells MatchDayController
+    // to enable the penalty shootout if the match is drawn after full time.
+    public bool PendingIsKnockout { get; private set; }
+
+    // True while FormationScene is loaded additively on top of MatchDayScene
+    // during a half-time formation edit. FormationScene's launcher checks
+    // this to show "Continue 2nd Half" instead of "Play Match".
+    public bool IsHalftimeEditing { get; private set; }
+
     public static MatchSession GetOrCreate()
     {
         if (instance != null)
@@ -45,5 +58,34 @@ public class MatchSession : MonoBehaviour
         MatchSetup setup = PendingSetup;
         PendingSetup = null;
         return setup;
+    }
+
+    public void SetPendingOpponentTeam(NationalTeamData team)
+    {
+        PendingOpponentTeam = team;
+    }
+
+    public NationalTeamData ConsumePendingOpponentTeam()
+    {
+        NationalTeamData team = PendingOpponentTeam;
+        PendingOpponentTeam = null;
+        return team;
+    }
+
+    public void SetPendingIsKnockout(bool isKnockout)
+    {
+        PendingIsKnockout = isKnockout;
+    }
+
+    public bool ConsumePendingIsKnockout()
+    {
+        bool value = PendingIsKnockout;
+        PendingIsKnockout = false;
+        return value;
+    }
+
+    public void SetHalftimeEditing(bool editing)
+    {
+        IsHalftimeEditing = editing;
     }
 }

@@ -381,11 +381,19 @@ public class FormationFieldManager : MonoBehaviour
         );
     }
 
+    private const int MaxSubstitutions = 5;
+
     public void SwapWithBench(PlayerData benchPlayer)
     {
         if (selectedStarter == null)
         {
             SetStatus("CHOOSE A STARTER FIRST");
+            return;
+        }
+
+        if (teamManager.substitutionsUsed >= MaxSubstitutions)
+        {
+            SetStatus("SUBSTITUTION LIMIT REACHED (" + MaxSubstitutions + "/" + MaxSubstitutions + ")");
             return;
         }
 
@@ -403,6 +411,7 @@ public class FormationFieldManager : MonoBehaviour
 
         teamManager.startingEleven[starterIndex] = benchPlayer;
         teamManager.benchPlayers[benchIndex] = outgoingStarter;
+        teamManager.substitutionsUsed++;
 
         selectedStarter.Setup(
             benchPlayer,
@@ -416,7 +425,7 @@ public class FormationFieldManager : MonoBehaviour
         RefreshBench();
         RefreshTeamStats();
 
-        SetStatus("SWAP COMPLETE");
+        SetStatus("SWAP COMPLETE (SUBS: " + teamManager.substitutionsUsed + "/" + MaxSubstitutions + ")");
     }
 
     private void RefreshBench()
