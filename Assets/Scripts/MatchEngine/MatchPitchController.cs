@@ -44,6 +44,11 @@ public class MatchPitchController : MonoBehaviour
     private Coroutine shakeRoutine;
     private MatchSetup currentSetup;
 
+    // Which side is currently mirrored (attacking toward -Y instead of +Y).
+    // Flipped at half-time so both teams swap ends, like real football.
+    private bool homeMirrored;
+    private bool awayMirrored = true;
+
     // The real, live ball carrier - whoever is actually holding it on the
     // pitch right now, not a fresh random pick. MatchDecisiveMomentController
     // reads this so the decision panel always matches who has the ball.
@@ -73,8 +78,8 @@ public class MatchPitchController : MonoBehaviour
         pitchPixelSize = pitchPanel.rect.size;
         pitchRestPosition = pitchPanel.anchoredPosition;
 
-        homeBasePositions = MatchPitchLayout.GetPositions(setup.home.startingEleven, false);
-        awayBasePositions = MatchPitchLayout.GetPositions(setup.away.startingEleven, true);
+        homeBasePositions = MatchPitchLayout.GetPositions(setup.home.startingEleven, homeMirrored);
+        awayBasePositions = MatchPitchLayout.GetPositions(setup.away.startingEleven, awayMirrored);
 
         SpawnTeam(setup.home.startingEleven, homeBasePositions, homeColor, homeTokens, homeCategories);
         SpawnTeam(setup.away.startingEleven, awayBasePositions, awayColor, awayTokens, awayCategories);
@@ -126,6 +131,14 @@ public class MatchPitchController : MonoBehaviour
         image.color = Color.white;
     }
 
+    // Called at half-time, before re-running Setup() for the 2nd half: both
+    // teams swap which goal they attack, matching real football.
+    public void SetSecondHalf()
+    {
+        homeMirrored = !homeMirrored;
+        awayMirrored = !awayMirrored;
+    }
+
     private void HandleGoalShake(GoalEvent goalEvent)
     {
         if (shakeRoutine != null)
@@ -171,8 +184,13 @@ public class MatchPitchController : MonoBehaviour
         List<Vector2> defendingBase = homeAttacking ? awayBasePositions : homeBasePositions;
         List<string> defendingCategories = homeAttacking ? awayCategories : homeCategories;
 
-        float attackPush = pushAmount;
-        float defendPush = -retreatAmount;
+        bool attackingMirrored = homeAttacking ? homeMirrored : awayMirrored;
+        bool defendingMirrored = homeAttacking ? awayMirrored : homeMirrored;
+        float attackSign = attackingMirrored ? -1f : 1f;
+        float defendSign = defendingMirrored ? -1f : 1f;
+
+        float attackPush = pushAmount * attackSign;
+        float defendPush = -retreatAmount * defendSign;
 
         // Tactical base targets (the shape each team holds this minute),
         // before any ball-chasing adjustments.
@@ -200,7 +218,7 @@ public class MatchPitchController : MonoBehaviour
         PushTargets(attackingTokens, attackingTargets);
         PushTargets(defendingTokens, defendingTargets);
 
-        float forwardNudge = homeAttacking ? 0.4f : -0.4f;
+        float forwardNudge = attackSign * 0.4f;
         Vector2 ballPitchPosition = carrierPosition + new Vector2(0f, forwardNudge);
         ballToken.SetTargetPosition(MatchPitchVisuals.PitchToAnchoredPosition(ballPitchPosition, pitchPixelSize));
     }

@@ -39,12 +39,23 @@ public class MatchPlaybackController : MonoBehaviour
     private IEnumerator PlaybackRoutine(MatchResult result)
     {
         float secondsPerMinute = realSecondsForFullMatch / 90f;
+        bool halfTimeRaised = false;
 
         Dictionary<int, List<MatchTimelineEntry>> entriesByMinute = GroupByMinute(result.timeline);
 
         for (int minute = 1; minute <= 90; minute++)
         {
             yield return new WaitUntil(() => !isPaused);
+
+            // First half just finished (minute 45's events already fired and
+            // its wait elapsed) - pause for the break before minute 46 starts.
+            if (minute == 46 && !halfTimeRaised)
+            {
+                halfTimeRaised = true;
+                isPaused = true;
+                MatchEvents.RaiseHalfTime();
+                yield return new WaitUntil(() => !isPaused);
+            }
 
             if (entriesByMinute.TryGetValue(minute, out List<MatchTimelineEntry> entries))
             {

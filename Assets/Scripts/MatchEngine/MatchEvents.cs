@@ -10,6 +10,8 @@ public static class MatchEvents
     public static event Action<int> OnMinuteTick;
     public static event Action<MatchResult> OnMatchEnd;
     public static event Action<int, MatchSide> OnPossessionTick;
+    public static event Action OnHalfTime;
+    public static event Action OnHalftimeEditComplete;
 
     public static void RaiseGoal(GoalEvent goalEvent) => OnGoal?.Invoke(goalEvent);
     public static void RaiseCard(CardEvent cardEvent) => OnCard?.Invoke(cardEvent);
@@ -17,4 +19,6 @@ public static class MatchEvents
     public static void RaiseMinuteTick(int minute) => OnMinuteTick?.Invoke(minute);
     public static void RaiseMatchEnd(MatchResult result) => OnMatchEnd?.Invoke(result);
     public static void RaisePossessionTick(int minute, MatchSide side) => OnPossessionTick?.Invoke(minute, side);
+    public static void RaiseHalfTime() => OnHalfTime?.Invoke();
+    public static void RaiseHalftimeEditComplete() => OnHalftimeEditComplete?.Invoke();
 }

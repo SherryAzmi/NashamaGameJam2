@@ -54,6 +54,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
     private float attackBoost = 1f;
     private float nextMomentAt;
     private bool matchActive;
+    private bool isHalftimePaused;
     private int currentMinute;
     private DecisiveMoment currentMoment;
 
@@ -80,6 +81,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
         currentMinute = 0;
         currentMoment = null;
         matchActive = true;
+        isHalftimePaused = false;
 
         decisivePanel.SetActive(false);
         resultPopup.SetActive(false);
@@ -98,9 +100,22 @@ public class MatchDecisiveMomentController : MonoBehaviour
         Time.timeScale = 1f;
     }
 
+    // Used for the half-time break: stop new moments from triggering while
+    // the score panel/formation editor is up, without ending the match.
+    public void PauseForHalftime()
+    {
+        isHalftimePaused = true;
+    }
+
+    public void ResumeFromHalftime()
+    {
+        isHalftimePaused = false;
+        ScheduleNextMoment();
+    }
+
     private void Update()
     {
-        if (!matchActive || currentMoment != null)
+        if (!matchActive || isHalftimePaused || currentMoment != null)
         {
             return;
         }
