@@ -96,14 +96,19 @@ public class PlayerToken : MonoBehaviour
 
     public void SetSelected(bool selected)
     {
-        if (isBusy || tokenRenderer == null)
+        if (tokenRenderer == null)
         {
             return;
         }
 
+        // A player in individual training stays grey by default,
+        // but can still be selected in FormationScene and replaced
+        // with an available bench player before a match.
         tokenRenderer.color = selected
             ? new Color(1f, 0.75f, 0.15f)
-            : normalColor;
+            : isBusy
+                ? new Color(0.5f, 0.5f, 0.5f)
+                : normalColor;
     }
 
     public void SetBusy(bool busy)

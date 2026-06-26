@@ -21,11 +21,8 @@ public class FormationFieldManager : MonoBehaviour
     public float playerZ = 9f;
 
     private TeamManager teamManager;
+    private TrainingManager trainingManager;
     private PlayerToken selectedStarter;
-
-
-
-
     private Camera mainCamera;
 
     private string currentFormation = "4-3-3";
@@ -57,6 +54,8 @@ public class FormationFieldManager : MonoBehaviour
             return;
         }
 
+        RestoreSavedFormation();
+
         formationSlots = GetFormationSlots(currentFormation);
 
         CreateFirstFormationIfNeeded();
@@ -68,11 +67,11 @@ public class FormationFieldManager : MonoBehaviour
     }
 
     private void Update()
-    {    if (UnityEngine.SceneManagement.SceneManager
+    {   if (UnityEngine.SceneManagement.SceneManager
         .GetActiveScene().name == "TrainingScene")
-    {
-        return;
-    }
+        {
+         return;
+        }
         if (Mouse.current == null || mainCamera == null)
         {
             return;
@@ -142,6 +141,7 @@ public class FormationFieldManager : MonoBehaviour
     private void ChangeFormation(string newFormation)
     {
         currentFormation = newFormation;
+        SaveCurrentFormation();
         formationSlots = GetFormationSlots(currentFormation);
 
         if (selectedStarter != null)
@@ -390,8 +390,6 @@ public class FormationFieldManager : MonoBehaviour
         );
     }
 
-    private const int MaxSubstitutions = 5;
-
     public void SwapWithBench(PlayerData benchPlayer)
     {
         // Bench cards stay visible in TrainingScene, but manual swapping is disabled.
@@ -403,12 +401,6 @@ public class FormationFieldManager : MonoBehaviour
         if (selectedStarter == null)
         {
             SetStatus("CHOOSE A STARTER FIRST");
-            return;
-        }
-
-        if (teamManager.substitutionsUsed >= MaxSubstitutions)
-        {
-            SetStatus("SUBSTITUTION LIMIT REACHED (" + MaxSubstitutions + "/" + MaxSubstitutions + ")");
             return;
         }
 
@@ -426,7 +418,6 @@ public class FormationFieldManager : MonoBehaviour
 
         teamManager.startingEleven[starterIndex] = benchPlayer;
         teamManager.benchPlayers[benchIndex] = outgoingStarter;
-        teamManager.substitutionsUsed++;
 
         selectedStarter.Setup(
             benchPlayer,
@@ -440,7 +431,7 @@ public class FormationFieldManager : MonoBehaviour
         RefreshBench();
         RefreshTeamStats();
 
-        SetStatus("SWAP COMPLETE (SUBS: " + teamManager.substitutionsUsed + "/" + MaxSubstitutions + ")");
+        SetStatus("SWAP COMPLETE");
     }
 
     // Called only by TrainingFieldManager when an individual starter begins training.
@@ -904,6 +895,58 @@ public class FormationFieldManager : MonoBehaviour
         }
 
         return 0;
+    }
+
+    // Reads the formation chosen in a previous visit to FormationScene.
+    // The selected players, starting eleven, and bench already live in
+    // TeamManager, which persists between scenes.
+    private void RestoreSavedFormation()
+    {
+        trainingManager = FindFirstObjectByType<TrainingManager>();
+
+        if (GameProgressManager.Instance != null &&
+            !string.IsNullOrWhiteSpace(
+                GameProgressManager.Instance.CurrentFormation
+            ))
+        {
+            currentFormation =
+                GameProgressManager.Instance.CurrentFormation;
+        }
+        else if (trainingManager != null &&
+                 !string.IsNullOrWhiteSpace(
+                     trainingManager.CurrentFormation
+                 ))
+        {
+            currentFormation = trainingManager.CurrentFormation;
+        }
+
+        if (trainingManager != null)
+        {
+            trainingManager.SetCurrentFormation(currentFormation);
+        }
+    }
+
+    // Saves only the tactical formation. Player swaps are already saved
+    // directly inside TeamManager.startingEleven and TeamManager.benchPlayers.
+    private void SaveCurrentFormation()
+    {
+        if (GameProgressManager.Instance != null)
+        {
+            GameProgressManager.Instance.SetCurrentFormation(
+                currentFormation
+            );
+        }
+
+        if (trainingManager == null)
+        {
+            trainingManager =
+                FindFirstObjectByType<TrainingManager>();
+        }
+
+        if (trainingManager != null)
+        {
+            trainingManager.SetCurrentFormation(currentFormation);
+        }
     }
 
     private FormationSlot[] GetFormationSlots(string formation)
