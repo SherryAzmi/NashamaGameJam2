@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Egypt
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Egypt
+  countryCode: EGY
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
+  attack: 76
+  midfield: 74
+  defense: 73
+  goalkeeper: 75
+  chemistry: 78
   preferredFormation: 4-3-3
-  playStyle: Balanced
+  playStyle: Attack

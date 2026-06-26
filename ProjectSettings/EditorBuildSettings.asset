@@ -5,6 +5,9 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
+  - enabled: 0
+    path: Assets/Scenes/SampleScene.unity
+    guid: 8c9cfa26abfee488c85f1582747f6a02
   - enabled: 1
     path: Assets/Scenes/MainScene.unity
     guid: f089d1af3666fce488582049866fca8a
@@ -12,14 +15,11 @@ EditorBuildSettings:
     path: Assets/Scenes/National team call-up system.unity
     guid: 835fb17b803006141a22fb336d45f5ed
   - enabled: 1
-    path: Assets/Scenes/CampaignScene.unity
-    guid: a965dcfe45726e04e94c2de5e32d6191
-  - enabled: 1
     path: Assets/Scenes/FormationScene.unity
     guid: 52c684572ed94bd4bb9b95faf380e2db
   - enabled: 1
-    path: Assets/Scenes/MatchDayScene.unity
-    guid: 5d66b115014ea0f45825745faf0fde00
+    path: Assets/Scenes/TrainingScene.unity
+    guid: 01497345db9df8b4b90aaa17f00466b1
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0

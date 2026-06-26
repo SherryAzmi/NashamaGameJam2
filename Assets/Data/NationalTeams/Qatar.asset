@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Qatar
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Qatar
+  countryCode: QAT
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
-  preferredFormation: 4-3-3
-  playStyle: Balanced
+  attack: 67
+  midfield: 69
+  defense: 65
+  goalkeeper: 68
+  chemistry: 72
+  preferredFormation: 4-4-2
+  playStyle: Counter Attack

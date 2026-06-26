@@ -22,6 +22,10 @@ public class FormationFieldManager : MonoBehaviour
 
     private TeamManager teamManager;
     private PlayerToken selectedStarter;
+
+
+
+
     private Camera mainCamera;
 
     private string currentFormation = "4-3-3";
@@ -64,7 +68,11 @@ public class FormationFieldManager : MonoBehaviour
     }
 
     private void Update()
+    {    if (UnityEngine.SceneManagement.SceneManager
+        .GetActiveScene().name == "TrainingScene")
     {
+        return;
+    }
         if (Mouse.current == null || mainCamera == null)
         {
             return;
@@ -80,6 +88,7 @@ public class FormationFieldManager : MonoBehaviour
         {
             return;
         }
+
 
         Vector2 mousePosition = Mouse.current.position.ReadValue();
 
@@ -385,6 +394,12 @@ public class FormationFieldManager : MonoBehaviour
 
     public void SwapWithBench(PlayerData benchPlayer)
     {
+        // Bench cards stay visible in TrainingScene, but manual swapping is disabled.
+        if (IsTrainingScene())
+        {
+            return;
+        }
+
         if (selectedStarter == null)
         {
             SetStatus("CHOOSE A STARTER FIRST");
@@ -426,6 +441,162 @@ public class FormationFieldManager : MonoBehaviour
         RefreshTeamStats();
 
         SetStatus("SWAP COMPLETE (SUBS: " + teamManager.substitutionsUsed + "/" + MaxSubstitutions + ")");
+    }
+
+    // Called only by TrainingFieldManager when an individual starter begins training.
+    public bool TryReplaceStarterForTraining(
+        PlayerData unavailablePlayer,
+        out PlayerData replacementPlayer,
+        out int starterIndex
+    )
+    {
+        replacementPlayer = null;
+        starterIndex = -1;
+
+        if (teamManager == null ||
+            unavailablePlayer == null ||
+            teamManager.startingEleven == null ||
+            teamManager.benchPlayers == null)
+        {
+            return false;
+        }
+
+        starterIndex = teamManager.startingEleven.IndexOf(
+            unavailablePlayer
+        );
+
+        if (starterIndex < 0 ||
+            starterIndex >= formationSlots.Length)
+        {
+            return false;
+        }
+
+        replacementPlayer = FindBestBenchReplacement(
+            formationSlots[starterIndex]
+        );
+
+        if (replacementPlayer == null)
+        {
+            return false;
+        }
+
+        int benchIndex = teamManager.benchPlayers.IndexOf(
+            replacementPlayer
+        );
+
+        if (benchIndex < 0)
+        {
+            return false;
+        }
+
+        teamManager.startingEleven[starterIndex] = replacementPlayer;
+        teamManager.benchPlayers[benchIndex] = unavailablePlayer;
+
+        RefreshTrainingView();
+        return true;
+    }
+
+    // Called by TrainingFieldManager after the individual session has finished.
+    public void RestoreStarterAfterTraining(
+        PlayerData originalPlayer,
+        PlayerData replacementPlayer,
+        int starterIndex
+    )
+    {
+        if (teamManager == null ||
+            originalPlayer == null ||
+            replacementPlayer == null ||
+            starterIndex < 0 ||
+            starterIndex >= teamManager.startingEleven.Count)
+        {
+            return;
+        }
+
+        // Do not overwrite a change the user made later in FormationScene.
+        if (teamManager.startingEleven[starterIndex] != replacementPlayer)
+        {
+            return;
+        }
+
+        int originalBenchIndex = teamManager.benchPlayers.IndexOf(
+            originalPlayer
+        );
+
+        teamManager.startingEleven[starterIndex] = originalPlayer;
+
+        if (originalBenchIndex >= 0)
+        {
+            teamManager.benchPlayers[originalBenchIndex] = replacementPlayer;
+        }
+        else if (!teamManager.benchPlayers.Contains(replacementPlayer))
+        {
+            teamManager.benchPlayers.Add(replacementPlayer);
+        }
+
+        RefreshTrainingView();
+    }
+
+    public void RefreshTrainingView()
+    {
+        if (selectedStarter != null)
+        {
+            selectedStarter.SetSelected(false);
+            selectedStarter = null;
+        }
+
+        RefreshStarterTokens();
+        RefreshBench();
+        RefreshTeamStats();
+    }
+
+    private PlayerData FindBestBenchReplacement(
+        FormationSlot slot
+    )
+    {
+        TrainingManager trainingManager =
+            FindFirstObjectByType<TrainingManager>();
+
+        PlayerData bestPlayer = null;
+        int bestScore = int.MinValue;
+
+        foreach (PlayerData candidate in teamManager.benchPlayers)
+        {
+            if (candidate == null)
+            {
+                continue;
+            }
+
+            if (trainingManager != null &&
+                trainingManager.IsPlayerBusy(candidate))
+            {
+                continue;
+            }
+
+            int score = GetOverall(candidate);
+
+            if (IsExactFit(candidate, slot))
+            {
+                score += 1000;
+            }
+            else if (IsSameUnit(candidate, slot))
+            {
+                score += 500;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestPlayer = candidate;
+            }
+        }
+
+        return bestPlayer;
+    }
+
+    private bool IsTrainingScene()
+    {
+        return UnityEngine.SceneManagement.SceneManager
+            .GetActiveScene().name == "TrainingScene";
     }
 
     private void RefreshBench()

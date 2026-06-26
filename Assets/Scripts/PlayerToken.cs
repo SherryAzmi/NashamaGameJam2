@@ -10,7 +10,7 @@ public class PlayerToken : MonoBehaviour
     private TextMesh textMeshLabel;
 
     private Color normalColor;
-    private FormationFieldManager formationManager;
+    private bool isBusy;
 
     public PlayerData Player { get; private set; }
     public string SlotName { get; private set; }
@@ -18,13 +18,17 @@ public class PlayerToken : MonoBehaviour
     private void Awake()
     {
         tokenRenderer = GetComponent<SpriteRenderer>();
-
         tmpLabel = GetComponentInChildren<TMP_Text>();
         textMeshLabel = GetComponentInChildren<TextMesh>();
 
-        normalColor = tokenRenderer.color;
+        normalColor = tokenRenderer != null
+            ? tokenRenderer.color
+            : Color.white;
 
-        tokenRenderer.sortingOrder = 10;
+        if (tokenRenderer != null)
+        {
+            tokenRenderer.sortingOrder = 10;
+        }
 
         if (tmpLabel != null)
         {
@@ -54,37 +58,72 @@ public class PlayerToken : MonoBehaviour
     public void Setup(
         PlayerData playerData,
         string slotName,
-        FormationFieldManager manager
+        FormationFieldManager unusedManager
     )
+    {
+        Setup(playerData, slotName);
+    }
+
+    public void Setup(PlayerData playerData, string slotName)
     {
         Player = playerData;
         SlotName = slotName;
-        formationManager = manager;
+        isBusy = false;
 
+        RefreshDisplay();
+    }
+
+    // Called after a training job ends, so the displayed OVR updates immediately.
+    public void RefreshDisplay()
+    {
         if (Player == null)
         {
-            SetLabel($"{slotName}\nEMPTY");
+            SetLabel(SlotName + "\nEMPTY");
+            ApplyColor();
             return;
         }
 
         SetLabel(
-            $"{Player.playerName}\n" +
-            $"{Player.position} • OVR {GetOverall(Player)}"
+            SlotName +
+            "\n" +
+            Player.playerName +
+            "\nOVR " +
+            GetOverall(Player)
         );
-    }
 
-    private void OnMouseDown()
-    {
-        if (formationManager != null)
-        {
-            formationManager.SelectStarter(this);
-        }
+        ApplyColor();
     }
 
     public void SetSelected(bool selected)
     {
+        if (isBusy || tokenRenderer == null)
+        {
+            return;
+        }
+
         tokenRenderer.color = selected
             ? new Color(1f, 0.75f, 0.15f)
+            : normalColor;
+    }
+
+    public void SetBusy(bool busy)
+    {
+        isBusy = busy;
+
+        // TrainingFieldManager calls SetBusy when time progresses.
+        // RefreshDisplay here makes the new permanent OVR appear right away.
+        RefreshDisplay();
+    }
+
+    private void ApplyColor()
+    {
+        if (tokenRenderer == null)
+        {
+            return;
+        }
+
+        tokenRenderer.color = isBusy
+            ? new Color(0.5f, 0.5f, 0.5f)
             : normalColor;
     }
 
@@ -101,11 +140,12 @@ public class PlayerToken : MonoBehaviour
         }
     }
 
-    private int GetOverall(PlayerData playerData)
+    private int GetOverall(PlayerData player)
     {
-        return
-            (playerData.speed +
-             playerData.shoot +
-             playerData.defense) / 3;
+        return (
+            player.speed +
+            player.shoot +
+            player.defense
+        ) / 3;
     }
 }

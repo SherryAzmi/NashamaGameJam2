@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2786a51def523d8428160e4701624c50, type: 3}
   m_Name: Jordan
   m_EditorClassIdentifier: 
-  teamName: 
-  countryCode: 
+  teamName: Jordan
+  countryCode: JOR
   flag: {fileID: 0}
-  attack: 70
-  midfield: 70
-  defense: 70
-  goalkeeper: 70
-  chemistry: 70
+  attack: 68
+  midfield: 66
+  defense: 65
+  goalkeeper: 67
+  chemistry: 74
   preferredFormation: 4-3-3
   playStyle: Balanced
