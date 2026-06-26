@@ -12,7 +12,7 @@ public class MainMenuController : MonoBehaviour
         PlayerPrefs.SetString("PlayerName", playerName);
         PlayerPrefs.Save();
 
-        SceneManager.LoadScene("ChooseScene");
+        SceneManager.LoadScene("NationalTeam");
     }
 
   

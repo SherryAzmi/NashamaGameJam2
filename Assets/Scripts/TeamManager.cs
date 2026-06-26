@@ -144,7 +144,7 @@ private static TeamManager instance;
             Debug.Log(player.playerName + " - " + player.position);
         }
 
-        SceneManager.LoadScene("CampaignScene");
+        SceneManager.LoadScene("ChooseScene");
     }
 
     void UpdateConfirmButton()
