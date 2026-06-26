@@ -10,6 +10,7 @@ public class TeamManager : MonoBehaviour
     [HideInInspector] public List<PlayerData> startingEleven = new List<PlayerData>();
     [HideInInspector] public List<PlayerData> benchPlayers = new List<PlayerData>();
     [HideInInspector] public bool formationInitialized = false;
+    [HideInInspector] public int substitutionsUsed = 0;
 
 private static TeamManager instance;    
     public PlayerDatabase database;
@@ -143,7 +144,7 @@ private static TeamManager instance;
             Debug.Log(player.playerName + " - " + player.position);
         }
 
-        SceneManager.LoadScene("FormationScene");
+        SceneManager.LoadScene("CampaignScene");
     }
 
     void UpdateConfirmButton()
