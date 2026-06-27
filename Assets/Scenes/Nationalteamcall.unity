@@ -1057,6 +1057,22 @@ MonoBehaviour:
   playerCardPrefab: {fileID: 7927176543193297952, guid: 7212e89a6b07bf94bb3f7f7cb862dd6f, type: 3}
   selectedText: {fileID: 1013736929}
   confirmButton: {fileID: 1189716141}
+  clubVisuals:
+  - clubName: 'Al Wehdat '
+    logo: {fileID: 21300000, guid: 90563f2c5f5cc8d48856f0d76e52922a, type: 3}
+  - clubName: 'Al Faisaly '
+    logo: {fileID: 4544649960199543188, guid: 005642ad4a17bc747a4449e26a78bf4b, type: 3}
+  - clubName: 'Al Hussein Irbid '
+    logo: {fileID: -2516737612005726511, guid: 2a3e450025e82a248805fe53e4e9bd23, type: 3}
+  - clubName: 'Al Ramtha '
+    logo: {fileID: -7708100688249583045, guid: 3ab4845703ce55a49853edc79e38c78f, type: 3}
+  - clubName: 'Al Jazeera '
+    logo: {fileID: 4595081958609607256, guid: 2b01f949fb7822d43a7d0c8c39adf244, type: 3}
+  - clubName: 'Al Salt '
+    logo: {fileID: 3573036208370857778, guid: b046de540b157604da782e61aa76520f, type: 3}
+  - clubName: PLAYERS ABROAD
+    logo: {fileID: 4327261208210592580, guid: e6a6b4984bf02bd429e6592841f9f2e1, type: 3}
+  defaultClubLogo: {fileID: 0}
 --- !u!4 &1504826222
 Transform:
   m_ObjectHideFlags: 0

@@ -5,8 +5,6 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class TrainingManager : MonoBehaviour
 {
-    private static TrainingManager instance;
-
     private const int MaxIndividualSlots = 2;
     private const int MaxPlayerBonus = 4;
     private const int MaxUnitBonus = 6;
@@ -46,10 +44,6 @@ public class TrainingManager : MonoBehaviour
 
     private float realTimeAccumulator;
 
-    // A job runs only after the player explicitly starts training.
-    // This prevents an old serialized job from running when opening HomeScene.
-    private bool trainingStartedByPlayer = false;
-
     public event Action OnTrainingStateChanged;
 
     public int DevelopmentPoints => developmentPoints;
@@ -73,48 +67,45 @@ public class TrainingManager : MonoBehaviour
         }
     }
 
-    private void Awake()
+ private void Awake()
+{
+    ResolveTeamManager();
+    ResetActiveTrainingForNewPlay();
+}
+[RuntimeInitializeOnLoadMethod(
+    RuntimeInitializeLoadType.BeforeSceneLoad
+)]
+private static void ResetOldTrainingManagersBeforePlay()
+{
+    TrainingManager[] managers =
+        FindObjectsByType<TrainingManager>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None
+        );
+
+    foreach (TrainingManager manager in managers)
     {
-        if (instance != null && instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        manager.ResetActiveTrainingForNewPlay();
+    }
+}
 
-        instance = this;
-        DontDestroyOnLoad(gameObject);
+private void ResetActiveTrainingForNewPlay()
+{
+    currentGameHour = 8;
+    realTimeAccumulator = 0f;
 
-        ResolveTeamManager();
-
-        // This runs once when a brand-new Play session begins.
-        // It does NOT run while moving between Home, Formation, and Training.
-        ResetActiveTrainingForNewPlay();
+    if (individualJobs == null)
+    {
+        individualJobs = new List<TrainingJob>();
+    }
+    else
+    {
+        individualJobs.Clear();
     }
 
-    [RuntimeInitializeOnLoadMethod(
-        RuntimeInitializeLoadType.SubsystemRegistration
-    )]
-    private static void ResetStaticInstance()
-    {
-        instance = null;
-    }
-    private void ResetActiveTrainingForNewPlay()
-    {
-        currentGameHour = 8;
-        realTimeAccumulator = 0f;
-        trainingStartedByPlayer = false;
+    collectiveJob = null;
+}
 
-        if (individualJobs == null)
-        {
-            individualJobs = new List<TrainingJob>();
-        }
-        else
-        {
-            individualJobs.Clear();
-        }
-
-        collectiveJob = null;
-    }
     private void Start()
     {
         EnsurePlayerStates();
@@ -124,15 +115,9 @@ public class TrainingManager : MonoBehaviour
 
     private void Update()
     {
-        if (!trainingStartedByPlayer || !HasActiveTraining)
+        if (!HasActiveTraining)
         {
             realTimeAccumulator = 0f;
-
-            if (!HasActiveTraining)
-            {
-                trainingStartedByPlayer = false;
-            }
-
             return;
         }
 
@@ -212,18 +197,37 @@ public class TrainingManager : MonoBehaviour
             NotifyTrainingStateChanged();
         }
     }
-    // Called after the player confirms a NEW 26-player squad.
-    public void ClearOldTrainingForNewSquad()
+
+    // Call this only when the player confirms a NEW 26-player squad.
+    // It removes jobs left from an older test/session, but keeps all
+    // permanent player-development values and team bonuses.
+    public void ClearActiveTrainingForNewSquad()
     {
-        ResetActiveTrainingForNewPlay();
+        currentGameHour = 8;
+        realTimeAccumulator = 0f;
+
+        if (individualJobs == null)
+        {
+            individualJobs = new List<TrainingJob>();
+        }
+        else
+        {
+            individualJobs.Clear();
+        }
+
+        collectiveJob = null;
+
+        Debug.Log("Old training jobs cleared for the new squad.");
         NotifyTrainingStateChanged();
     }
+
     public TrainingPreview GetTrainingPreview(
         PlayerData player,
         TrainingType type
     )
     {
         ResolveTeamManager();
+        CompleteFinishedTraining();
         EnsurePlayerStates();
 
         TrainingPreview preview = new TrainingPreview
@@ -270,7 +274,6 @@ public class TrainingManager : MonoBehaviour
             return false;
         }
 
-        trainingStartedByPlayer = true;
         developmentPoints -= validatedPreview.cost;
 
         TrainingJob job = new TrainingJob
@@ -441,11 +444,11 @@ public class TrainingManager : MonoBehaviour
             return;
         }
 
-        if (HasFullTeamTraining())
+        if (collectiveJob != null)
         {
             Fail(
                 preview,
-                "Full-team training is active. Wait until it ends."
+                "A unit or full-team program is already active. Wait for it."
             );
             return;
         }
