@@ -1565,7 +1565,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eef61f68a588e4d4ca889dc192e77af2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hideOldWorldStations: 0
+  hideOldWorldStations: 1
 --- !u!1 &1314202238
 GameObject:
   m_ObjectHideFlags: 0

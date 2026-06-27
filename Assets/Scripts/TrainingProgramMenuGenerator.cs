@@ -207,8 +207,8 @@ public class TrainingProgramMenuGenerator : MonoBehaviour
             new Vector2(560f, 100f)
         );
 
-       
-       
+
+        
 
         RefreshActiveTrainingText();
 

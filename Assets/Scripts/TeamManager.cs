@@ -1,28 +1,46 @@
+using System;
 using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
+using System.Linq;
 using TMPro;
+using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class TeamManager : MonoBehaviour
-{   
+{
     public List<PlayerData> selectedPlayers = new List<PlayerData>();
     [HideInInspector] public List<PlayerData> startingEleven = new List<PlayerData>();
     [HideInInspector] public List<PlayerData> benchPlayers = new List<PlayerData>();
     [HideInInspector] public bool formationInitialized = false;
     [HideInInspector] public int substitutionsUsed = 0;
 
-private static TeamManager instance;    
+    private static TeamManager instance;
+
     public PlayerDatabase database;
 
-    [Header("UI")]
+    [Header("Existing UI")]
     public Transform content;
     public GameObject playerCardPrefab;
     public TMP_Text selectedText;
     public Button confirmButton;
 
+    [Header("Club Browser")]
+    [Tooltip("Optional. Assign a logo Sprite for every club name and for PLAYERS ABROAD.")]
+    [SerializeField] private List<ClubVisual> clubVisuals =
+        new List<ClubVisual>();
 
-    private readonly List<PlayerCardUI> spawnedCards = new List<PlayerCardUI>();
+    [Tooltip("Optional fallback logo when a club does not have its own Sprite.")]
+    [SerializeField] private Sprite defaultClubLogo;
+
+    private const string AbroadGroupName = "PLAYERS ABROAD";
+
+    private readonly List<PlayerCardUI> spawnedCards =
+        new List<PlayerCardUI>();
+
+    private readonly Dictionary<string, List<PlayerData>> playersByGroup =
+        new Dictionary<string, List<PlayerData>>(
+            StringComparer.OrdinalIgnoreCase
+        );
 
     private int maxPlayers = 26;
 
@@ -33,21 +51,31 @@ private static TeamManager instance;
 
     private bool squadConfirmed = false;
 
-    private void Awake()
-{
-    if (instance != null && instance != this)
+    [Serializable]
+    public class ClubVisual
     {
-        Destroy(gameObject);
-        return;
+        [Tooltip("Write exactly the club name from PlayerData, or PLAYERS ABROAD.")]
+        public string clubName;
+
+        public Sprite logo;
     }
 
-    instance = this;
-    DontDestroyOnLoad(gameObject);
-}
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
 
     private void Start()
     {
-        CreatePlayerCards();
+        BuildPlayerGroups();
+        ShowClubCards();
 
         confirmButton.onClick.RemoveAllListeners();
         confirmButton.onClick.AddListener(ConfirmSquad);
@@ -56,24 +84,488 @@ private static TeamManager instance;
         UpdateConfirmButton();
     }
 
-    void CreatePlayerCards()
+    // Main screen: one image card for each Jordanian club + one Abroad card.
+    public void ShowClubCards()
     {
+        ClearContent();
+
+        foreach (string groupName in GetOrderedGroupNames())
+        {
+            CreateClubCard(groupName, playersByGroup[groupName]);
+        }
+    }
+
+    // Called when a club card is pressed.
+    private void ShowPlayersForClub(string groupName)
+    {
+        if (!playersByGroup.ContainsKey(groupName))
+        {
+            return;
+        }
+
+        ClearContent();
+        CreateBackToClubsButton();
+        CreateGroupHeader(groupName, playersByGroup[groupName].Count);
+
+        List<PlayerData> sortedPlayers =
+            playersByGroup[groupName]
+                .OrderBy(GetPositionSortOrder)
+                .ThenBy(player => player.playerName)
+                .ToList();
+
+        foreach (PlayerData player in sortedPlayers)
+        {
+            CreatePlayerCard(player);
+        }
+    }
+
+    private void BuildPlayerGroups()
+    {
+        playersByGroup.Clear();
+
+        if (database == null || database.players == null)
+        {
+            Debug.LogError("Player Database is missing.");
+            return;
+        }
+
         foreach (PlayerData player in database.players)
         {
-            GameObject card = Instantiate(playerCardPrefab, content);
-
-            PlayerCardUI cardUI = card.GetComponent<PlayerCardUI>();
-
-            if (cardUI == null)
+            if (player == null)
             {
-                Debug.LogError("PlayerCard Prefab is missing PlayerCardUI.");
-                Destroy(card);
                 continue;
             }
 
-            cardUI.Setup(player, this);
-            spawnedCards.Add(cardUI);
+            string groupName = IsAbroadPlayer(player)
+                ? AbroadGroupName
+                : GetSafeClubName(player.club);
+
+            if (!playersByGroup.ContainsKey(groupName))
+            {
+                playersByGroup[groupName] = new List<PlayerData>();
+            }
+
+            playersByGroup[groupName].Add(player);
         }
+    }
+
+    private bool IsAbroadPlayer(PlayerData player)
+    {
+        return player != null &&
+               string.Equals(
+                   player.category,
+                   "Abroad",
+                   StringComparison.OrdinalIgnoreCase
+               );
+    }
+
+    private string GetSafeClubName(string clubName)
+    {
+        return string.IsNullOrWhiteSpace(clubName)
+            ? "OTHER JORDANIAN CLUBS"
+            : clubName.Trim();
+    }
+
+    private List<string> GetOrderedGroupNames()
+    {
+        List<string> ordered = new List<string>();
+
+        // These appear first when they exist in your Player Database.
+        string[] preferredOrder =
+        {
+            "Al Wehdat",
+            "Al Faisaly",
+            "Al Hussein Irbid",
+            "Al Ramtha",
+            "Al Jazeera",
+            "Al Salt"
+        };
+
+        foreach (string clubName in preferredOrder)
+        {
+            if (playersByGroup.ContainsKey(clubName))
+            {
+                ordered.Add(clubName);
+            }
+        }
+
+        foreach (string groupName in playersByGroup.Keys
+                     .Where(name =>
+                         !string.Equals(
+                             name,
+                             AbroadGroupName,
+                             StringComparison.OrdinalIgnoreCase
+                         ) &&
+                         !ordered.Contains(name)
+                     )
+                     .OrderBy(name => name))
+        {
+            ordered.Add(groupName);
+        }
+
+        if (playersByGroup.ContainsKey(AbroadGroupName))
+        {
+            ordered.Add(AbroadGroupName);
+        }
+
+        return ordered;
+    }
+
+    private void ClearContent()
+    {
+        spawnedCards.Clear();
+
+        if (content == null)
+        {
+            return;
+        }
+
+        for (int i = content.childCount - 1; i >= 0; i--)
+        {
+            Destroy(content.GetChild(i).gameObject);
+        }
+    }
+
+    private void CreateClubCard(
+        string groupName,
+        List<PlayerData> players
+    )
+    {
+        if (content == null)
+        {
+            return;
+        }
+
+        GameObject cardObject = new GameObject(
+            groupName + " Club Card",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(Button),
+            typeof(LayoutElement),
+            typeof(HorizontalLayoutGroup)
+        );
+
+        cardObject.transform.SetParent(content, false);
+
+        LayoutElement layout = cardObject.GetComponent<LayoutElement>();
+        layout.preferredHeight = 185f;
+
+        Image background = cardObject.GetComponent<Image>();
+        background.color = IsAbroadGroup(groupName)
+            ? new Color(0.08f, 0.20f, 0.38f, 1f)
+            : new Color(0.02f, 0.25f, 0.14f, 1f);
+
+        HorizontalLayoutGroup horizontal =
+            cardObject.GetComponent<HorizontalLayoutGroup>();
+        horizontal.padding = new RectOffset(22, 22, 18, 18);
+        horizontal.spacing = 22f;
+        horizontal.childAlignment = TextAnchor.MiddleLeft;
+        horizontal.childControlWidth = true;
+        horizontal.childControlHeight = true;
+        horizontal.childForceExpandWidth = false;
+        horizontal.childForceExpandHeight = true;
+
+        GameObject logoObject = new GameObject(
+            "Club Logo",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+        logoObject.transform.SetParent(cardObject.transform, false);
+
+        LayoutElement logoLayout =
+            logoObject.GetComponent<LayoutElement>();
+        logoLayout.preferredWidth = 130f;
+        logoLayout.preferredHeight = 130f;
+        logoLayout.flexibleWidth = 0f;
+
+        Sprite clubLogo = FindClubLogo(groupName);
+
+        Image logoImage = logoObject.GetComponent<Image>();
+        logoImage.sprite = clubLogo;
+        logoImage.overrideSprite = clubLogo;
+        logoImage.type = Image.Type.Simple;
+        logoImage.preserveAspect = true;
+
+        // No default grey UI square when a logo is missing.
+        logoImage.enabled = clubLogo != null;
+
+        Debug.Log(
+            "Club logo: " + groupName + " -> " +
+            (clubLogo != null ? clubLogo.name : "MISSING")
+        );
+
+        GameObject textArea = new GameObject(
+            "Text Area",
+            typeof(RectTransform),
+            typeof(VerticalLayoutGroup),
+            typeof(LayoutElement)
+        );
+        textArea.transform.SetParent(cardObject.transform, false);
+
+        LayoutElement textLayout =
+            textArea.GetComponent<LayoutElement>();
+        textLayout.flexibleWidth = 1f;
+        textLayout.minWidth = 0f;
+
+
+        VerticalLayoutGroup vertical =
+            textArea.GetComponent<VerticalLayoutGroup>();
+        vertical.childAlignment = TextAnchor.MiddleLeft;
+        vertical.spacing = 8f;
+        vertical.childControlWidth = true;
+        vertical.childControlHeight = false;
+        vertical.childForceExpandHeight = false;
+
+        CreateCardText(
+            "Club Name",
+            textArea.transform,
+            groupName.ToUpperInvariant(),
+            34f,
+            FontStyles.Bold,
+            Color.white,
+            52f
+        );
+
+        CreateCardText(
+            "Player Count",
+            textArea.transform,
+            players.Count + " PLAYERS",
+            23f,
+            FontStyles.Normal,
+            new Color(0.85f, 0.92f, 0.88f, 1f),
+            38f
+        );
+
+        Button button = cardObject.GetComponent<Button>();
+        button.targetGraphic = background;
+
+        string capturedGroupName = groupName;
+        button.onClick.AddListener(() =>
+        {
+            ShowPlayersForClub(capturedGroupName);
+        });
+    }
+
+    private void CreateBackToClubsButton()
+    {
+        GameObject backObject = new GameObject(
+            "Back To Clubs Button",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(Button),
+            typeof(LayoutElement)
+        );
+
+        backObject.transform.SetParent(content, false);
+
+        LayoutElement layout = backObject.GetComponent<LayoutElement>();
+        layout.preferredHeight = 78f;
+
+        Image background = backObject.GetComponent<Image>();
+        background.color = new Color(0.12f, 0.18f, 0.42f, 1f);
+
+        Button button = backObject.GetComponent<Button>();
+        button.targetGraphic = background;
+        button.onClick.AddListener(ShowClubCards);
+
+        TextMeshProUGUI label = CreateStretchText(
+            "Text",
+            backObject.transform,
+            "← BACK TO CLUBS",
+            27f,
+            FontStyles.Bold,
+            Color.white,
+            TextAlignmentOptions.Center
+        );
+        label.raycastTarget = false;
+    }
+
+    private void CreateGroupHeader(string groupName, int count)
+    {
+        GameObject headerObject = new GameObject(
+            "Club Header",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+
+        headerObject.transform.SetParent(content, false);
+
+        LayoutElement layout = headerObject.GetComponent<LayoutElement>();
+        layout.preferredHeight = 90f;
+
+        Image background = headerObject.GetComponent<Image>();
+        background.color = new Color(0.03f, 0.11f, 0.07f, 1f);
+
+        TextMeshProUGUI label = CreateStretchText(
+            "Text",
+            headerObject.transform,
+            groupName.ToUpperInvariant() + "\n" + count + " PLAYERS",
+            25f,
+            FontStyles.Bold,
+            new Color(0.95f, 0.95f, 0.95f, 1f),
+            TextAlignmentOptions.Center
+        );
+        label.raycastTarget = false;
+    }
+
+    private void CreatePlayerCard(PlayerData player)
+    {
+        if (playerCardPrefab == null || content == null)
+        {
+            Debug.LogError("Player Card Prefab or Content is missing.");
+            return;
+        }
+
+        GameObject card = Instantiate(playerCardPrefab, content);
+
+        PlayerCardUI cardUI = card.GetComponent<PlayerCardUI>();
+
+        if (cardUI == null)
+        {
+            Debug.LogError("PlayerCard Prefab is missing PlayerCardUI.");
+            Destroy(card);
+            return;
+        }
+
+        cardUI.Setup(player, this);
+
+        // The selection stays visible when the user goes back to clubs
+        // then opens the same club again.
+        cardUI.SetSelected(selectedPlayers.Contains(player));
+
+        if (squadConfirmed)
+        {
+            cardUI.SetLocked(true);
+        }
+
+        spawnedCards.Add(cardUI);
+    }
+
+    private Sprite FindClubLogo(string groupName)
+    {
+        string requestedKey = NormalizeClubKey(groupName);
+
+        foreach (ClubVisual visual in clubVisuals)
+        {
+            if (visual == null || visual.logo == null)
+            {
+                continue;
+            }
+
+            if (NormalizeClubKey(visual.clubName) == requestedKey)
+            {
+                return visual.logo;
+            }
+        }
+
+        return defaultClubLogo;
+    }
+
+    // Handles invisible spaces, different capitalization, hyphens,
+    // and accidental extra spaces in a club name.
+    private string NormalizeClubKey(string clubName)
+    {
+        if (string.IsNullOrWhiteSpace(clubName))
+        {
+            return string.Empty;
+        }
+
+        return clubName
+            .Trim()
+            .Replace(" ", string.Empty)
+            .Replace("-", string.Empty)
+            .Replace("_", string.Empty)
+            .ToUpperInvariant();
+    }
+
+    private bool IsAbroadGroup(string groupName)
+    {
+        return string.Equals(
+            groupName,
+            AbroadGroupName,
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private TextMeshProUGUI CreateCardText(
+        string objectName,
+        Transform parent,
+        string value,
+        float fontSize,
+        FontStyles style,
+        Color color,
+        float preferredHeight
+    )
+    {
+        GameObject textObject = new GameObject(
+            objectName,
+            typeof(RectTransform),
+            typeof(TextMeshProUGUI),
+            typeof(LayoutElement)
+        );
+
+        textObject.transform.SetParent(parent, false);
+
+        LayoutElement layout = textObject.GetComponent<LayoutElement>();
+        layout.preferredHeight = preferredHeight;
+
+        TextMeshProUGUI text =
+            textObject.GetComponent<TextMeshProUGUI>();
+        text.font = TMP_Settings.defaultFontAsset;
+        text.text = value;
+        text.fontSize = fontSize;
+        text.fontStyle = style;
+        text.color = color;
+        text.alignment = TextAlignmentOptions.Left;
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.raycastTarget = false;
+
+        return text;
+    }
+
+    private TextMeshProUGUI CreateStretchText(
+        string objectName,
+        Transform parent,
+        string value,
+        float fontSize,
+        FontStyles style,
+        Color color,
+        TextAlignmentOptions alignment
+    )
+    {
+        GameObject textObject = new GameObject(
+            objectName,
+            typeof(RectTransform),
+            typeof(TextMeshProUGUI)
+        );
+
+        textObject.transform.SetParent(parent, false);
+
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI text =
+            textObject.GetComponent<TextMeshProUGUI>();
+        text.font = TMP_Settings.defaultFontAsset;
+        text.text = value;
+        text.fontSize = fontSize;
+        text.fontStyle = style;
+        text.color = color;
+        text.alignment = alignment;
+        text.enableWordWrapping = true;
+        text.raycastTarget = false;
+
+        return text;
     }
 
     public void TogglePlayer(PlayerData player, PlayerCardUI cardUI)
@@ -111,7 +603,7 @@ private static TeamManager instance;
         UpdateConfirmButton();
     }
 
-    void ConfirmSquad()
+    private void ConfirmSquad()
     {
         if (selectedPlayers.Count != maxPlayers)
         {
@@ -128,7 +620,8 @@ private static TeamManager instance;
 
         confirmButton.interactable = false;
 
-        TMP_Text buttonText = confirmButton.GetComponentInChildren<TMP_Text>();
+        TMP_Text buttonText =
+            confirmButton.GetComponentInChildren<TMP_Text>();
 
         if (buttonText != null)
         {
@@ -144,27 +637,30 @@ private static TeamManager instance;
             Debug.Log(player.playerName + " - " + player.position);
         }
 
-        // A newly confirmed national squad starts with no previous training job.
         TrainingManager trainingManager =
             FindFirstObjectByType<TrainingManager>();
 
         if (trainingManager != null)
         {
-            trainingManager.ClearOldTrainingForNewSquad();
+            trainingManager.ClearActiveTrainingForNewSquad();
         }
 
         GameProgressManager.Instance.MarkTeamSelected();
         SceneManager.LoadScene("HomeScene");
     }
 
-    void UpdateConfirmButton()
+    private void UpdateConfirmButton()
     {
         if (squadConfirmed)
+        {
             return;
+        }
 
-        confirmButton.interactable = selectedPlayers.Count == maxPlayers;
+        confirmButton.interactable =
+            selectedPlayers.Count == maxPlayers;
 
-        TMP_Text buttonText = confirmButton.GetComponentInChildren<TMP_Text>();
+        TMP_Text buttonText =
+            confirmButton.GetComponentInChildren<TMP_Text>();
 
         if (buttonText != null)
         {
@@ -174,16 +670,16 @@ private static TeamManager instance;
         }
     }
 
-    bool CanSelectPlayer(PlayerData player)
+    private bool CanSelectPlayer(PlayerData player)
     {
         int gk = 0;
         int def = 0;
         int mid = 0;
         int att = 0;
 
-        foreach (PlayerData p in selectedPlayers)
+        foreach (PlayerData selectedPlayer in selectedPlayers)
         {
-            switch (GetPositionCategory(p.position))
+            switch (GetPositionCategory(selectedPlayer.position))
             {
                 case "GK": gk++; break;
                 case "DEF": def++; break;
@@ -202,7 +698,7 @@ private static TeamManager instance;
         return true;
     }
 
-    string GetPositionCategory(string position)
+    private string GetPositionCategory(string position)
     {
         switch (position)
         {
@@ -229,7 +725,19 @@ private static TeamManager instance;
         return "MID";
     }
 
-    void UpdateSelectedText()
+    private int GetPositionSortOrder(PlayerData player)
+    {
+        switch (GetPositionCategory(player.position))
+        {
+            case "GK": return 0;
+            case "DEF": return 1;
+            case "MID": return 2;
+            case "ATT": return 3;
+            default: return 4;
+        }
+    }
+
+    private void UpdateSelectedText()
     {
         int gk = 0;
         int def = 0;
@@ -252,11 +760,11 @@ private static TeamManager instance;
             : "";
 
         selectedText.text =
-            "Selected: "+
-            " (GK: " + gk + " / " + maxGoalkeepers+")" +
-            " (DEF: " + def + " / " + maxDefenders+")" +
-            " (MID: " + mid + " / " + maxMidfielders+")" +
-            " (ATT: " + att + " / " + maxAttackers+")" +
+            "Selected: " +
+            " (GK: " + gk + " / " + maxGoalkeepers + ")" +
+            " (DEF: " + def + " / " + maxDefenders + ")" +
+            " (MID: " + mid + " / " + maxMidfielders + ")" +
+            " (ATT: " + att + " / " + maxAttackers + ")" +
             confirmedMessage;
     }
 }
