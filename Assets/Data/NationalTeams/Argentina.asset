@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Argentina
   countryCode: ARG
-  flag: {fileID: 0}
+  flag: {fileID: 5044127093511370165, guid: 3fb0c427dc3931644afe95bc407a060d, type: 3}
   attack: 90
   midfield: 88
   defense: 84

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Belgium
   countryCode: BEL
-  flag: {fileID: 0}
+  flag: {fileID: -2876497050227541946, guid: 39f1c8951adf3624dafeab6888599183, type: 3}
   attack: 83
   midfield: 82
   defense: 78

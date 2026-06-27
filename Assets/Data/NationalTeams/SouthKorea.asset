@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: South Korea
   countryCode: KOR
-  flag: {fileID: 0}
+  flag: {fileID: 3869406669457217619, guid: 33ed2d5201df90946884d4cfef716b94, type: 3}
   attack: 78
   midfield: 77
   defense: 74

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: United States
   countryCode: USA
-  flag: {fileID: 0}
+  flag: {fileID: -5929668430974483817, guid: 3f85af6326434e94facdaf4c7a8ae8e7, type: 3}
   attack: 78
   midfield: 77
   defense: 75

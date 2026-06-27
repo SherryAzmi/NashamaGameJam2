@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: South Africa
   countryCode: RSA
-  flag: {fileID: 0}
+  flag: {fileID: 9001708027972573443, guid: 1fd5d599135c8f24c9ba2439763e9cfa, type: 3}
   attack: 70
   midfield: 69
   defense: 70

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Uzbekistan
   countryCode: UZB
-  flag: {fileID: 0}
+  flag: {fileID: -891666468631093851, guid: f56c31b829f80104ebf1a734e6121dc7, type: 3}
   attack: 72
   midfield: 71
   defense: 69

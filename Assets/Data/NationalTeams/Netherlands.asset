@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Netherlands
   countryCode: NED
-  flag: {fileID: 0}
+  flag: {fileID: 9024689083240934129, guid: 39b3424c396eec447a961eca2d45ca15, type: 3}
   attack: 85
   midfield: 84
   defense: 82

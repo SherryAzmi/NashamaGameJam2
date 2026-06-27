@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Ecuador
   countryCode: ECU
-  flag: {fileID: 0}
+  flag: {fileID: -7412179767957933355, guid: 4df2abe0d5daa754383da20e8f869dc8, type: 3}
   attack: 76
   midfield: 75
   defense: 74

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Iraq
   countryCode: IRQ
-  flag: {fileID: 0}
+  flag: {fileID: -4267934551936702141, guid: af0b3b540794e5042872391d3a2c1264, type: 3}
   attack: 69
   midfield: 68
   defense: 67

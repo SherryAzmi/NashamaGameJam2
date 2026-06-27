@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Colombia
   countryCode: COL
-  flag: {fileID: 0}
+  flag: {fileID: 4152115206092537845, guid: b45b6a44342452340a9631d2e74802e0, type: 3}
   attack: 81
   midfield: 80
   defense: 78

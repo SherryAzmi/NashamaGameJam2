@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Egypt
   countryCode: EGY
-  flag: {fileID: 0}
+  flag: {fileID: 563498430988167784, guid: d80308aecced03a428e7185be80a12e8, type: 3}
   attack: 76
   midfield: 74
   defense: 73

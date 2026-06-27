@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Paraguay
   countryCode: PAR
-  flag: {fileID: 0}
+  flag: {fileID: 1045955873030546316, guid: 76167d31e2dd5154ca60f9f85d5ba08a, type: 3}
   attack: 72
   midfield: 71
   defense: 74

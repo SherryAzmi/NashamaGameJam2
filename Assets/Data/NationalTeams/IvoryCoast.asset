@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Ivory Coast
   countryCode: CIV
-  flag: {fileID: 0}
+  flag: {fileID: 3007640463898171749, guid: 05d0da6df62c6b84db8029eb35d97ea6, type: 3}
   attack: 77
   midfield: 75
   defense: 74

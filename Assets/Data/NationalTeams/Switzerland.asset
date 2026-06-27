@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Switzerland
   countryCode: SUI
-  flag: {fileID: 0}
+  flag: {fileID: -2659323127668995491, guid: 7dc03c0c9e905de498793d1d1f745aed, type: 3}
   attack: 79
   midfield: 80
   defense: 81

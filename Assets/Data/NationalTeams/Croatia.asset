@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Croatia
   countryCode: CRO
-  flag: {fileID: 0}
+  flag: {fileID: -5446989583718250477, guid: 1ff2d4e096d512845ad82940a7ee1769, type: 3}
   attack: 82
   midfield: 84
   defense: 80

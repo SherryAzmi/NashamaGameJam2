@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Brazil
   countryCode: BRA
-  flag: {fileID: 0}
+  flag: {fileID: -978920110821036188, guid: b0d3f29224ec4b84cadb9e58adb2030f, type: 3}
   attack: 89
   midfield: 87
   defense: 82

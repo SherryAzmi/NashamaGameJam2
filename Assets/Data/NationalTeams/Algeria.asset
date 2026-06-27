@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Algeria
   countryCode: ALG
-  flag: {fileID: 0}
+  flag: {fileID: -5940237986788949923, guid: 960f0cc811aba074ca00ba47d8646813, type: 3}
   attack: 78
   midfield: 77
   defense: 74

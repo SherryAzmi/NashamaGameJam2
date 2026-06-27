@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Ghana
   countryCode: GHA
-  flag: {fileID: 0}
+  flag: {fileID: -3534113280708332236, guid: 6a2c3b154ebed70438e1c059ca196f8c, type: 3}
   attack: 72
   midfield: 71
   defense: 70

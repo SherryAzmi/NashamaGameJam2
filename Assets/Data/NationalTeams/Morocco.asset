@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Morocco
   countryCode: MAR
-  flag: {fileID: 0}
+  flag: {fileID: 1066157645539685022, guid: 327c6b5d5af18ed47985e636c9e32fe9, type: 3}
   attack: 82
   midfield: 81
   defense: 80

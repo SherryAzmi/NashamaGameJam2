@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Uruguay
   countryCode: URU
-  flag: {fileID: 0}
+  flag: {fileID: 3235050509642709770, guid: e2effc3cf5571fe4d8ca52630faf8c3d, type: 3}
   attack: 82
   midfield: 80
   defense: 80

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Senegal
   countryCode: SEN
-  flag: {fileID: 0}
+  flag: {fileID: 6413008629731802542, guid: 76879b0ef620e4b4c878a6c2a6b387c3, type: 3}
   attack: 80
   midfield: 78
   defense: 77

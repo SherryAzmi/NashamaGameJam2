@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Canada
   countryCode: CAN
-  flag: {fileID: 0}
+  flag: {fileID: 1242679398475033408, guid: a107c5ec3ac468d43aead15da6493142, type: 3}
   attack: 74
   midfield: 73
   defense: 70

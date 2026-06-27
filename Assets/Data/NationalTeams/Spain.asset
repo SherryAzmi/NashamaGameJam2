@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Spain
   countryCode: ESP
-  flag: {fileID: 0}
+  flag: {fileID: -8058530595887252168, guid: 5b8f37d5edadb994293b876cac27f22a, type: 3}
   attack: 88
   midfield: 90
   defense: 84

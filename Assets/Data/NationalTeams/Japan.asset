@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Japan
   countryCode: JPN
-  flag: {fileID: 0}
+  flag: {fileID: -5088598318403538062, guid: 8daa6c2b832d7f7479f1050ede5f2714, type: 3}
   attack: 79
   midfield: 80
   defense: 76

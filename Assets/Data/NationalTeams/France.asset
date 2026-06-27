@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: France
   countryCode: FRA
-  flag: {fileID: 0}
+  flag: {fileID: -3089401738558927306, guid: 4a2491a79d2048e448d45e2bc9c4c9eb, type: 3}
   attack: 91
   midfield: 89
   defense: 87

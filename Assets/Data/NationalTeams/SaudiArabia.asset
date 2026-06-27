@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Saudi Arabia
   countryCode: KSA
-  flag: {fileID: 0}
+  flag: {fileID: 8724799369002589122, guid: abb725f70a144d643911126bf07ab1f4, type: 3}
   attack: 72
   midfield: 71
   defense: 69

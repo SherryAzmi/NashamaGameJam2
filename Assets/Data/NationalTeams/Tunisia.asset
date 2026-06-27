@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Tunisia
   countryCode: TUN
-  flag: {fileID: 0}
+  flag: {fileID: 8654444422293208473, guid: 8db62a25277e0194ba3ec4b3dca05217, type: 3}
   attack: 73
   midfield: 72
   defense: 74

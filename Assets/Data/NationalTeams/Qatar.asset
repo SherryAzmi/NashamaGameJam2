@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Qatar
   countryCode: QAT
-  flag: {fileID: 0}
+  flag: {fileID: -6288229118970514626, guid: 3d467abbc35b79543bf7d214649c8983, type: 3}
   attack: 67
   midfield: 69
   defense: 65

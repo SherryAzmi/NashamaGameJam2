@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Germany
   countryCode: GER
-  flag: {fileID: 0}
+  flag: {fileID: 7982187317204991484, guid: e851057ba2d5d7c4a8f498d65c4683cc, type: 3}
   attack: 86
   midfield: 85
   defense: 82

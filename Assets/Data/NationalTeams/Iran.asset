@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Iran
   countryCode: IRN
-  flag: {fileID: 0}
+  flag: {fileID: -6543302149439699985, guid: 9d40039508589d34690b3b21fed83f66, type: 3}
   attack: 76
   midfield: 75
   defense: 74

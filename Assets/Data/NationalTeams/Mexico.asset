@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Mexico
   countryCode: MEX
-  flag: {fileID: 0}
+  flag: {fileID: -6752805805799011333, guid: e6e442c85cf44694c9b4c4fd1b0ad950, type: 3}
   attack: 77
   midfield: 76
   defense: 75

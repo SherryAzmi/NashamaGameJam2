@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Australia
   countryCode: AUS
-  flag: {fileID: 0}
+  flag: {fileID: 1169349105735761803, guid: c3c795fae6644b148b834b1da871ac35, type: 3}
   attack: 74
   midfield: 72
   defense: 75

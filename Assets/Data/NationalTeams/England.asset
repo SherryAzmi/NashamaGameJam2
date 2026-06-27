@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: England
   countryCode: ENG
-  flag: {fileID: 0}
+  flag: {fileID: 77241284103607220, guid: 7c6d184458cc2ca439672998497aab0f, type: 3}
   attack: 89
   midfield: 87
   defense: 84

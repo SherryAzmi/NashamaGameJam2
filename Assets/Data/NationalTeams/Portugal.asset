@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   teamName: Portugal
   countryCode: POR
-  flag: {fileID: 0}
+  flag: {fileID: 5257949920208685051, guid: 5733e1f1e2d015547b02542dc4443ff3, type: 3}
   attack: 87
   midfield: 86
   defense: 82
