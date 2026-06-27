@@ -138,6 +138,11 @@ public class FormationFieldManager : MonoBehaviour
         ChangeFormation("3-5-2");
     }
 
+    public void Set4321()
+    {
+        ChangeFormation("4-3-2-1");
+    }
+
     private void ChangeFormation(string newFormation)
     {
         currentFormation = newFormation;
@@ -150,10 +155,108 @@ public class FormationFieldManager : MonoBehaviour
             selectedStarter = null;
         }
 
+        ReassignStartingElevenToSlots();
         RefreshStarterTokens();
         RefreshTeamStats();
 
         SetStatus("FORMATION CHANGED TO " + currentFormation);
+    }
+
+    // Re-sorts the same 11 starters into the new formation's slots by best
+    // fit instead of reusing each player's old index - formations don't all
+    // have the same number of DEF/MID/ATT slots, so a blind index reuse can
+    // hand a defender a striker's slot (or worse). The real goalkeeper is
+    // always pinned to the "GK" slot first, since exactly one player can
+    // ever fill it.
+    private void ReassignStartingElevenToSlots()
+    {
+        List<PlayerData> pool = new List<PlayerData>(teamManager.startingEleven);
+        PlayerData[] assigned = new PlayerData[formationSlots.Length];
+
+        for (int i = 0; i < formationSlots.Length; i++)
+        {
+            if (formationSlots[i].slotName != "GK")
+            {
+                continue;
+            }
+
+            PlayerData keeper = pool.Find(
+                player => player != null &&
+                    NormalizePosition(player.position) == "GK"
+            );
+
+            if (keeper == null)
+            {
+                keeper = pool.Find(player => player != null);
+            }
+
+            assigned[i] = keeper;
+            pool.Remove(keeper);
+        }
+
+        List<int> remainingSlotIndices = new List<int>();
+
+        for (int i = 0; i < formationSlots.Length; i++)
+        {
+            if (assigned[i] == null)
+            {
+                remainingSlotIndices.Add(i);
+            }
+        }
+
+        // Greedily hand every remaining slot its best-fitting candidate
+        // first (exact position match, then same unit, then anyone left),
+        // one slot/player pair at a time, so the most specialised slots get
+        // first pick of the pool.
+        while (remainingSlotIndices.Count > 0 && pool.Count > 0)
+        {
+            int bestSlotListIndex = -1;
+            int bestPlayerIndex = -1;
+            int bestScore = int.MinValue;
+
+            for (int s = 0; s < remainingSlotIndices.Count; s++)
+            {
+                FormationSlot slot = formationSlots[remainingSlotIndices[s]];
+
+                for (int p = 0; p < pool.Count; p++)
+                {
+                    PlayerData candidate = pool[p];
+
+                    if (candidate == null)
+                    {
+                        continue;
+                    }
+
+                    int score = GetFitBonus(candidate, slot);
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestSlotListIndex = s;
+                        bestPlayerIndex = p;
+                    }
+                }
+            }
+
+            if (bestSlotListIndex < 0)
+            {
+                break;
+            }
+
+            int slotIndex = remainingSlotIndices[bestSlotListIndex];
+            assigned[slotIndex] = pool[bestPlayerIndex];
+
+            pool.RemoveAt(bestPlayerIndex);
+            remainingSlotIndices.RemoveAt(bestSlotListIndex);
+        }
+
+        for (int i = 0; i < assigned.Length && i < teamManager.startingEleven.Count; i++)
+        {
+            if (assigned[i] != null)
+            {
+                teamManager.startingEleven[i] = assigned[i];
+            }
+        }
     }
 
     private void CreateFirstFormationIfNeeded()
@@ -627,12 +730,13 @@ public class FormationFieldManager : MonoBehaviour
             return;
         }
 
-        int power = CalculateTeamPower();
-        int chemistry = CalculateChemistry();
+        TeamRatingMath.TeamRatings ratings = CalculateRatings();
 
-        int attack = CalculateUnitRating("ATT");
-        int midfield = CalculateUnitRating("MID");
-        int defense = CalculateUnitRating("DEF");
+        int power = ratings.power;
+        int chemistry = ratings.chemistry;
+        int attack = ratings.attack;
+        int midfield = ratings.midfield;
+        int defense = ratings.defense;
 
         teamStatsText.text =
             "FORMATION: " + currentFormation +
@@ -643,139 +747,28 @@ public class FormationFieldManager : MonoBehaviour
             "   DEF: " + defense;
     }
 
-    private int CalculateTeamPower()
+    // All four numbers (ATT/MID/DEF/POWER/CHEMISTRY) are computed by
+    // TeamRatingMath - the same module MatchSetupBuilder uses to build the
+    // MatchDay preview ratings - so this screen and the match preview can
+    // never show different numbers for the same squad/formation/training
+    // state again.
+    private TeamRatingMath.TeamRatings CalculateRatings()
     {
-        float totalOverall = 0f;
-        float fitBonus = 0f;
-
-        for (int i = 0; i < teamManager.startingEleven.Count; i++)
-        {
-            PlayerData player = teamManager.startingEleven[i];
-
-            if (player == null)
-            {
-                continue;
-            }
-
-            totalOverall += GetOverall(player);
-            fitBonus += GetFitBonus(player, formationSlots[i]);
-        }
-
-        float averageOverall = totalOverall / 11f;
-        float averageFitBonus = fitBonus / 11f;
-
-        return Mathf.Clamp(
-            Mathf.RoundToInt(
-                averageOverall +
-                averageFitBonus +
-                GetFormationPowerBonus()
-            ),
-            0,
-            99
+        return TeamRatingMath.CalculateAll(
+            teamManager.startingEleven,
+            currentFormation,
+            GetTeamTrainingState()
         );
     }
 
-    private int CalculateChemistry()
+    private TeamTrainingState GetTeamTrainingState()
     {
-        int chemistry = 45;
-
-        for (int i = 0; i < teamManager.startingEleven.Count; i++)
+        if (trainingManager == null)
         {
-            PlayerData player = teamManager.startingEleven[i];
-
-            if (player == null)
-            {
-                continue;
-            }
-
-            if (IsExactFit(player, formationSlots[i]))
-            {
-                chemistry += 4;
-            }
-            else if (IsSameUnit(player, formationSlots[i]))
-            {
-                chemistry += 2;
-            }
-            else
-            {
-                chemistry -= 3;
-            }
+            trainingManager = FindFirstObjectByType<TrainingManager>();
         }
 
-        for (int i = 0; i < teamManager.startingEleven.Count; i++)
-        {
-            for (int j = i + 1;
-                 j < teamManager.startingEleven.Count;
-                 j++)
-            {
-                PlayerData first = teamManager.startingEleven[i];
-                PlayerData second = teamManager.startingEleven[j];
-
-                if (first == null || second == null)
-                {
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(first.club) &&
-                    first.club == second.club)
-                {
-                    chemistry += 2;
-                }
-            }
-        }
-
-        chemistry += GetFormationChemistryBonus();
-
-        return Mathf.Clamp(chemistry, 0, 100);
-    }
-
-    private int CalculateUnitRating(string unit)
-    {
-        float total = 0f;
-        int count = 0;
-
-        for (int i = 0; i < teamManager.startingEleven.Count; i++)
-        {
-            if (GetSlotCategory(formationSlots[i]) != unit)
-            {
-                continue;
-            }
-
-            PlayerData player = teamManager.startingEleven[i];
-
-            if (player == null)
-            {
-                continue;
-            }
-
-            if (unit == "ATT")
-            {
-                total += (player.speed + player.shoot * 2f) / 3f;
-            }
-            else if (unit == "DEF")
-            {
-                total += (player.defense * 2f + player.speed) / 3f;
-            }
-            else
-            {
-                total += GetOverall(player);
-            }
-
-            count++;
-        }
-
-        if (count == 0)
-        {
-            return 0;
-        }
-
-        int tacticalBonus = GetTacticalBonus(unit);
-
-        return Mathf.Clamp(
-            Mathf.RoundToInt(total / count) + tacticalBonus,
-            0,
-            99
-        );
+        return trainingManager != null ? trainingManager.TeamState : null;
     }
 
     private int GetFitBonus(
@@ -823,78 +816,6 @@ public class FormationFieldManager : MonoBehaviour
         string slotCategory = GetSlotCategory(slot);
 
         return playerCategory == slotCategory;
-    }
-
-    private int GetFormationPowerBonus()
-    {
-        switch (currentFormation)
-        {
-            case "4-3-3":
-                return 2;
-
-            case "4-4-2":
-                return 1;
-
-            case "4-2-3-1":
-                return 2;
-
-            case "3-5-2":
-                return 1;
-        }
-
-        return 0;
-    }
-
-    private int GetFormationChemistryBonus()
-    {
-        switch (currentFormation)
-        {
-            case "4-3-3":
-                return 3;
-
-            case "4-4-2":
-                return 4;
-
-            case "4-2-3-1":
-                return 5;
-
-            case "3-5-2":
-                return 1;
-        }
-
-        return 0;
-    }
-
-    private int GetTacticalBonus(string unit)
-    {
-        switch (currentFormation)
-        {
-            case "4-3-3":
-                if (unit == "ATT") return 5;
-                if (unit == "MID") return 3;
-                if (unit == "DEF") return 1;
-                break;
-
-            case "4-4-2":
-                if (unit == "ATT") return 3;
-                if (unit == "MID") return 3;
-                if (unit == "DEF") return 5;
-                break;
-
-            case "4-2-3-1":
-                if (unit == "ATT") return 4;
-                if (unit == "MID") return 6;
-                if (unit == "DEF") return 3;
-                break;
-
-            case "3-5-2":
-                if (unit == "ATT") return 4;
-                if (unit == "MID") return 7;
-                if (unit == "DEF") return -2;
-                break;
-        }
-
-        return 0;
     }
 
     // Reads the formation chosen in a previous visit to FormationScene.
@@ -1009,6 +930,26 @@ public class FormationFieldManager : MonoBehaviour
 
                     new FormationSlot("LS", new Vector2(-0.85f, 2f), "ST", "LW"),
                     new FormationSlot("RS", new Vector2(0.85f, 2f), "ST", "RW")
+                };
+
+            case "4-3-2-1":
+                return new FormationSlot[]
+                {
+                    new FormationSlot("GK", new Vector2(0f, -3.70f), "GK"),
+
+                    new FormationSlot("LB", new Vector2(-2f, -2.65f), "LB"),
+                    new FormationSlot("LCB", new Vector2(-0.70f, -2.85f), "CB"),
+                    new FormationSlot("RCB", new Vector2(0.70f, -2.85f), "CB"),
+                    new FormationSlot("RB", new Vector2(2f, -2.65f), "RB"),
+
+                    new FormationSlot("LCM", new Vector2(-1.45f, -0.95f), "CM", "DM", "AM"),
+                    new FormationSlot("CM", new Vector2(0f, -0.55f), "CM", "DM", "AM"),
+                    new FormationSlot("RCM", new Vector2(1.45f, -0.95f), "CM", "DM", "AM"),
+
+                    new FormationSlot("LSS", new Vector2(-0.95f, 1.15f), "CAM", "AM", "LW", "ST"),
+                    new FormationSlot("RSS", new Vector2(0.95f, 1.15f), "CAM", "AM", "RW", "ST"),
+
+                    new FormationSlot("ST", new Vector2(0f, 2.40f), "ST")
                 };
 
             default:

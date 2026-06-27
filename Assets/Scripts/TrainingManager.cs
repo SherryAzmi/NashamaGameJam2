@@ -417,6 +417,11 @@ private void ResetActiveTrainingForNewPlay()
             collectiveJob = job;
         }
 
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayTraining();
+        }
+
         NotifyTrainingStateChanged();
         return true;
     }

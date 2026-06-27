@@ -12,6 +12,12 @@ public class TeamMatchRatings
     public int defense;
     public int power;
 
+    // The real formation string ("4-3-3", etc.) the player actually picked
+    // (home) or the opponent's preferred formation (away) - shown directly
+    // in the MatchDay preview instead of being re-inferred from positions,
+    // which could disagree with what was actually selected.
+    public string formation;
+
     // Null until set by MatchSetupBuilder (home/Jordan) or
     // NationalTeamOpponentBuilder (away) - the flag sprite from the source
     // NationalTeamData, threaded through for the MatchDay preview UI.

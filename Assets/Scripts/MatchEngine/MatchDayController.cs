@@ -50,6 +50,14 @@ public class MatchDayController : MonoBehaviour
     public Button continueButton;
     public string campaignSceneName = "CampaignScene";
 
+    [Header("Lose / Retry")]
+    [Tooltip("Shown only right after a loss, and only if the retry for this match hasn't been used yet.")]
+    public Button retryButton;
+    [Tooltip("Shown only after losing the SAME match a second time (the one retry already used) - wipes the whole campaign and sends the player back to squad selection.")]
+    public Button restartCampaignButton;
+    public TMP_Text retryInfoText;
+    public int retryConsolationPoints = 20;
+
     [Header("Systems")]
     public MatchPitchController pitchController;
     public MatchPlaybackController playbackController;
@@ -74,6 +82,11 @@ public class MatchDayController : MonoBehaviour
     private readonly System.Collections.Generic.List<string> logLines = new System.Collections.Generic.List<string>();
     private readonly System.Collections.Generic.List<GoalEvent> liveGoals = new System.Collections.Generic.List<GoalEvent>();
 
+    // Resets once per scene load (i.e. once per fixture) - one retry is
+    // allowed per match. A second loss on the same match forces a full
+    // campaign restart instead of a normal "continue".
+    private int lossAttemptsThisMatch;
+
     private void Start()
     {
         setup = MatchSession.GetOrCreate().ConsumePendingSetup();
@@ -85,6 +98,7 @@ public class MatchDayController : MonoBehaviour
         }
 
         isKnockoutMatch = MatchSession.GetOrCreate().ConsumePendingIsKnockout() || isKnockoutMatch;
+        lossAttemptsThisMatch = 0;
 
         ShowPreview();
 
@@ -93,6 +107,18 @@ public class MatchDayController : MonoBehaviour
 
         continueButton.onClick.RemoveAllListeners();
         continueButton.onClick.AddListener(ReturnToCampaign);
+
+        if (retryButton != null)
+        {
+            retryButton.onClick.RemoveAllListeners();
+            retryButton.onClick.AddListener(RetryMatch);
+        }
+
+        if (restartCampaignButton != null)
+        {
+            restartCampaignButton.onClick.RemoveAllListeners();
+            restartCampaignButton.onClick.AddListener(() => CampaignRestartService.RestartWholeCampaign());
+        }
 
         editFormationButton.onClick.RemoveAllListeners();
         editFormationButton.onClick.AddListener(EditFormationAtHalftime);
@@ -152,8 +178,8 @@ public class MatchDayController : MonoBehaviour
         matchHud.SetActive(false);
         resultPanel.SetActive(false);
 
-        homeFormationText.text = "JORDAN\n" + MatchPitchLayout.InferFormationLabel(setup.home.startingEleven);
-        awayFormationText.text = setup.away.teamName.ToUpperInvariant() + "\n" + MatchPitchLayout.InferFormationLabel(setup.away.startingEleven);
+        homeFormationText.text = "JORDAN\n" + setup.home.formation;
+        awayFormationText.text = setup.away.teamName.ToUpperInvariant() + "\n" + setup.away.formation;
 
         homeStatsText.text = FormatStats(setup.home);
         awayStatsText.text = FormatStats(setup.away);
@@ -161,8 +187,8 @@ public class MatchDayController : MonoBehaviour
         homePlayerListText.text = FormatPlayerList(setup.home.startingEleven);
         awayPlayerListText.text = FormatPlayerList(setup.away.startingEleven);
 
-        homePreviewDiagram.Render(setup.home.startingEleven, false);
-        awayPreviewDiagram.Render(setup.away.startingEleven, true);
+        homePreviewDiagram.Render(setup.home.startingEleven, setup.home.formation, false);
+        awayPreviewDiagram.Render(setup.away.startingEleven, "4-3-3", true);
 
         SetFlag(homeFlagImage, setup.home.flag);
         SetFlag(awayFlagImage, setup.away.flag);
@@ -260,7 +286,22 @@ public class MatchDayController : MonoBehaviour
 
         if (teamManager != null)
         {
-            setup.home = MatchSetupBuilder.BuildRatings("Jordan", teamManager.startingEleven);
+            // Read fresh in case the manager changed formation during the
+            // halftime edit - not the formation the 1st half started with.
+            string formation = GameProgressManager.Instance != null && !string.IsNullOrWhiteSpace(GameProgressManager.Instance.CurrentFormation)
+                ? GameProgressManager.Instance.CurrentFormation
+                : setup.home.formation;
+            TeamTrainingState trainingState = TrainingManager.Instance != null ? TrainingManager.Instance.TeamState : null;
+
+            setup.home = MatchSetupBuilder.BuildRatings("Jordan", teamManager.startingEleven, formation, trainingState);
+        }
+
+        // Whatever lineup is about to play the 2nd half (possibly just
+        // edited at halftime) gets locked in now, so it survives a crash
+        // or an early quit at the 45-minute mark.
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.SaveCurrentState();
         }
 
         pitchController.SetSecondHalf();
@@ -279,6 +320,11 @@ public class MatchDayController : MonoBehaviour
         else
         {
             awayScore++;
+        }
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayGoal(goalEvent.side);
         }
 
         UpdateScoreText();
@@ -342,6 +388,77 @@ public class MatchDayController : MonoBehaviour
         resultText.text =
             $"FULL TIME\n\nJORDAN {homeScore} - {awayScore} {setup.away.teamName.ToUpperInvariant()}{penaltyLine}\n\n" +
             $"MAN OF THE MATCH: {motmName}";
+
+        UpdateLoseRetryUi();
+    }
+
+    // A draw only counts as a loss in a knockout match (it always resolves
+    // to a winner via penalties before this is called) - a drawn friendly
+    // is not a loss and gets no retry/restart prompt.
+    private bool DidJordanLose()
+    {
+        bool homeWon = penaltyHomeWon ?? (homeScore > awayScore);
+        bool isDraw = !isKnockoutMatch && homeScore == awayScore;
+
+        return !isDraw && !homeWon;
+    }
+
+    private void UpdateLoseRetryUi()
+    {
+        bool jordanLost = DidJordanLose();
+        bool canRetry = jordanLost && lossAttemptsThisMatch == 0;
+        bool mustRestartCampaign = jordanLost && lossAttemptsThisMatch >= 1;
+
+        if (retryButton != null)
+        {
+            retryButton.gameObject.SetActive(canRetry);
+        }
+
+        if (restartCampaignButton != null)
+        {
+            restartCampaignButton.gameObject.SetActive(mustRestartCampaign);
+        }
+
+        if (continueButton != null)
+        {
+            continueButton.gameObject.SetActive(!mustRestartCampaign);
+        }
+
+        if (retryInfoText != null)
+        {
+            if (mustRestartCampaign)
+            {
+                retryInfoText.text = "YOU LOST THIS MATCH TWICE - THE WHOLE CAMPAIGN MUST RESTART.";
+            }
+            else if (canRetry)
+            {
+                retryInfoText.text = $"YOU LOST. RETRY THIS MATCH FOR +{retryConsolationPoints} DEVELOPMENT POINTS, OR CONTINUE TO ACCEPT THE RESULT.";
+            }
+            else
+            {
+                retryInfoText.text = "";
+            }
+        }
+    }
+
+    // Replays this exact fixture from kickoff - same opponent, no campaign
+    // result recorded yet. Costs the player's one retry for this match and
+    // grants a small consolation reward toward training.
+    private void RetryMatch()
+    {
+        lossAttemptsThisMatch++;
+
+        if (TrainingManager.Instance != null)
+        {
+            TrainingManager.Instance.AddDevelopmentPoints(retryConsolationPoints);
+        }
+
+        if (retryButton != null)
+        {
+            retryButton.gameObject.SetActive(false);
+        }
+
+        KickOff();
     }
 
     private string FindManOfTheMatch()

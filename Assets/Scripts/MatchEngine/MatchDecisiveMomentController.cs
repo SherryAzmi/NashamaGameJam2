@@ -29,6 +29,12 @@ public class MatchDecisiveMomentController : MonoBehaviour
     public float slowMotionScale = 0.3f;
     public float resultPopupDuration = 1.6f;
 
+    [Header("Field-position trigger")]
+    [Tooltip("Once a ball carrier's progress toward the goal they're attacking crosses this (0-1), a decisive moment can fire immediately instead of waiting for the random timer - the closer to goal, the more it matters.")]
+    public float dangerZoneProgress = 0.78f;
+    [Tooltip("Hard floor between any two moments, even a proximity-triggered one, so the player always has breathing room.")]
+    public float minimumMomentCooldown = 4f;
+
     [Header("Decision panel")]
     public GameObject decisivePanel;
     public TMP_Text contextText;
@@ -57,6 +63,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
     private bool isHalftimePaused;
     private int currentMinute;
     private DecisiveMoment currentMoment;
+    private float lastMomentEndTime = -999f;
 
     private void OnEnable()
     {
@@ -120,10 +127,31 @@ public class MatchDecisiveMomentController : MonoBehaviour
             return;
         }
 
-        if (Time.time >= nextMomentAt)
+        if (Time.time - lastMomentEndTime < minimumMomentCooldown)
+        {
+            return;
+        }
+
+        if (IsInDangerZone() || Time.time >= nextMomentAt)
         {
             TriggerMoment();
         }
+    }
+
+    // The decision should appear because something is actually happening on
+    // the pitch (a team closing in on a goal), not on a context-free timer.
+    // Whichever side currently has the ball pushing deep into the other
+    // team's third fires the moment early - same check works for both "my
+    // team is attacking" and "the opponent is attacking me" since it just
+    // reads whoever is the live possessing side.
+    private bool IsInDangerZone()
+    {
+        if (pitchController == null || !pitchController.CurrentPossessingSide.HasValue)
+        {
+            return false;
+        }
+
+        return pitchController.CurrentAttackProgress01 >= dangerZoneProgress;
     }
 
     // Uses scaled time on purpose: at higher game speed, decisive moments
@@ -167,17 +195,22 @@ public class MatchDecisiveMomentController : MonoBehaviour
         PlayerData liveCarrier = pitchController != null ? pitchController.CurrentCarrier : null;
         bool attackMoment = liveSide.HasValue ? liveSide.Value == MatchSide.Home : Random.value < 0.5f;
 
+        float fieldProgress = pitchController != null ? pitchController.CurrentAttackProgress01 : 0.5f;
+        int nearbyDefenders = pitchController != null ? pitchController.CurrentNearbyDefenderCount : 0;
+
         if (attackMoment)
         {
             PlayerData carrier = liveCarrier != null && liveSide.HasValue
                 ? liveCarrier
                 : PickWeightedCarrier(setup.home.startingEleven);
-            PlayerData opponentGoalkeeper = FindGoalkeeper(setup.away.startingEleven);
+            PlayerData opponentGoalkeeper = FindGoalkeeper(setup.away.startingEleven, "4-3-3");
 
             currentMoment = new DecisiveMoment(DecisiveMomentType.Attack, carrier, opponentGoalkeeper, setup.away.defense)
             {
                 attackBoost = attackBoost,
-                difficultyMultiplier = difficultyMultiplier
+                difficultyMultiplier = difficultyMultiplier,
+                fieldProgress = fieldProgress,
+                nearbyDefenderCount = nearbyDefenders
             };
 
             ShowAttackPanel(currentMoment);
@@ -187,11 +220,13 @@ public class MatchDecisiveMomentController : MonoBehaviour
             PlayerData threat = liveCarrier != null && liveSide.HasValue
                 ? liveCarrier
                 : PickWeightedCarrier(setup.away.startingEleven);
-            PlayerData defender = PickDefender(setup.home.startingEleven);
+            PlayerData defender = PickDefender(setup.home.startingEleven, setup.home.formation);
 
             currentMoment = new DecisiveMoment(DecisiveMomentType.Defense, defender, threat, setup.away.defense)
             {
-                difficultyMultiplier = difficultyMultiplier
+                difficultyMultiplier = difficultyMultiplier,
+                fieldProgress = fieldProgress,
+                nearbyDefenderCount = nearbyDefenders
             };
 
             ShowDefensePanel(currentMoment);
@@ -203,11 +238,12 @@ public class MatchDecisiveMomentController : MonoBehaviour
 
     private void ShowAttackPanel(DecisiveMoment moment)
     {
-        contextText.text = moment.actor.playerName + " HAS THE BALL!";
+        contextText.text = BuildAttackSituationText(moment);
 
-        SetButtonAction(option1Button, option1Label, "SHOOT", DecisiveAction.Shoot);
-        SetButtonAction(option2Button, option2Label, "PASS", DecisiveAction.Pass);
-        SetButtonAction(option3Button, option3Label, "DRIBBLE", DecisiveAction.Dribble);
+        DecisiveAction[] options = BuildAttackOptions(moment);
+        SetButtonAction(option1Button, option1Label, moment, options[0]);
+        SetButtonAction(option2Button, option2Label, moment, options[1]);
+        SetButtonAction(option3Button, option3Label, moment, options[2]);
 
         resultPopup.SetActive(false);
         decisivePanel.SetActive(true);
@@ -215,25 +251,149 @@ public class MatchDecisiveMomentController : MonoBehaviour
 
     private void ShowDefensePanel(DecisiveMoment moment)
     {
-        contextText.text = moment.opponent.playerName + " IS ATTACKING!";
+        contextText.text = BuildDefenseSituationText(moment);
 
-        SetButtonAction(option1Button, option1Label, "TACKLE", DecisiveAction.Tackle);
-        SetButtonAction(option2Button, option2Label, "BLOCK", DecisiveAction.Block);
-        SetButtonAction(option3Button, option3Label, "PRESS", DecisiveAction.Press);
+        DecisiveAction[] options = BuildDefenseOptions(moment);
+        SetButtonAction(option1Button, option1Label, moment, options[0]);
+        SetButtonAction(option2Button, option2Label, moment, options[1]);
+        SetButtonAction(option3Button, option3Label, moment, options[2]);
 
         resultPopup.SetActive(false);
         decisivePanel.SetActive(true);
     }
 
-    private void SetButtonAction(Button button, TMP_Text label, string text, DecisiveAction action)
+    // Which 3 actions actually make sense changes with the situation - a
+    // clear chance right in front of goal offers a genuinely different menu
+    // than a deep build-up where shooting isn't realistic, instead of
+    // always presenting the same fixed Shoot/Pass/Dribble trio regardless
+    // of context.
+    private DecisiveAction[] BuildAttackOptions(DecisiveMoment moment)
     {
-        label.text = text;
+        if (moment.fieldProgress >= 0.78f && moment.nearbyDefenderCount == 0)
+        {
+            return new[] { DecisiveAction.Shoot, DecisiveAction.ThroughBall, DecisiveAction.Dribble };
+        }
+
+        if (moment.fieldProgress >= 0.78f)
+        {
+            return new[] { DecisiveAction.Shoot, DecisiveAction.Pass, DecisiveAction.Dribble };
+        }
+
+        if (moment.fieldProgress >= 0.45f)
+        {
+            return new[] { DecisiveAction.Shoot, DecisiveAction.Pass, DecisiveAction.ThroughBall };
+        }
+
+        return new[] { DecisiveAction.LongBall, DecisiveAction.Pass, DecisiveAction.Dribble };
+    }
+
+    private DecisiveAction[] BuildDefenseOptions(DecisiveMoment moment)
+    {
+        if (moment.fieldProgress >= 0.78f)
+        {
+            return new[] { DecisiveAction.Block, DecisiveAction.Tackle, DecisiveAction.Press };
+        }
+
+        if (moment.nearbyDefenderCount <= 1)
+        {
+            return new[] { DecisiveAction.Cover, DecisiveAction.Tackle, DecisiveAction.Press };
+        }
+
+        return new[] { DecisiveAction.Tackle, DecisiveAction.Press, DecisiveAction.Cover };
+    }
+
+    // Narrates what's actually happening (zone, defenders in the way) and
+    // gives a plain read on the situation, instead of a generic "has the
+    // ball" line that never changes no matter how dangerous the moment is.
+    private string BuildAttackSituationText(DecisiveMoment moment)
+    {
+        string zone = GetZoneLabel(moment.fieldProgress);
+        string defenderLine = GetDefenderLine(moment.nearbyDefenderCount);
+        string advice = moment.nearbyDefenderCount >= 2
+            ? "SHOOTING LOOKS RISKY HERE - A PASS MAY BE SAFER."
+            : moment.nearbyDefenderCount == 0 && moment.fieldProgress >= 0.6f
+                ? "THIS IS A CLEAR CHANCE TO SHOOT!"
+                : "READ THE DEFENSE BEFORE YOU DECIDE.";
+
+        return moment.actor.playerName.ToUpperInvariant() + " " + zone +
+            "\n" + defenderLine +
+            "\n" + advice;
+    }
+
+    private string BuildDefenseSituationText(DecisiveMoment moment)
+    {
+        string zone = GetZoneLabel(moment.fieldProgress);
+        string supportLine = moment.nearbyDefenderCount <= 1
+            ? "YOU'RE ISOLATED - LITTLE SUPPORT NEARBY."
+            : moment.nearbyDefenderCount + " DEFENDERS ARE CLOSE ENOUGH TO HELP.";
+
+        return moment.opponent.playerName.ToUpperInvariant() + " " + zone +
+            "\n" + supportLine;
+    }
+
+    private string GetZoneLabel(float fieldProgress)
+    {
+        if (fieldProgress >= 0.78f)
+        {
+            return "IS IN THE BOX!";
+        }
+
+        if (fieldProgress >= 0.5f)
+        {
+            return "IS IN THE FINAL THIRD";
+        }
+
+        return "IS BUILDING UP PLAY";
+    }
+
+    private string GetDefenderLine(int defenderCount)
+    {
+        if (defenderCount <= 0)
+        {
+            return "NO DEFENDERS IN THE WAY.";
+        }
+
+        if (defenderCount == 1)
+        {
+            return "1 DEFENDER IN FRONT OF HIM.";
+        }
+
+        return defenderCount + " DEFENDERS IN FRONT OF HIM.";
+    }
+
+    private void SetButtonAction(Button button, TMP_Text label, DecisiveMoment moment, DecisiveAction action)
+    {
+        int oddsPercent = Mathf.RoundToInt(MatchDecisiveMomentResolver.PreviewChance(moment, action) * 100f);
+        label.text = GetActionLabel(action) + " (" + oddsPercent + "%)";
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => ResolveChoice(action));
     }
 
+    private string GetActionLabel(DecisiveAction action)
+    {
+        switch (action)
+        {
+            case DecisiveAction.Shoot: return "SHOOT";
+            case DecisiveAction.Pass: return "PASS";
+            case DecisiveAction.Dribble: return "DRIBBLE";
+            case DecisiveAction.ThroughBall: return "THROUGH BALL";
+            case DecisiveAction.LongBall: return "LONG BALL";
+            case DecisiveAction.Tackle: return "TACKLE";
+            case DecisiveAction.Block: return "BLOCK";
+            case DecisiveAction.Press: return "PRESS";
+            case DecisiveAction.Cover: return "COVER";
+        }
+
+        return action.ToString().ToUpperInvariant();
+    }
+
     private void ResolveChoice(DecisiveAction action)
     {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayDecisiveAction(action);
+        }
+
         DecisiveMomentOutcome outcome = MatchDecisiveMomentResolver.Resolve(currentMoment, action);
 
         TotalBonusPoints += outcome.bonusPoints;
@@ -266,6 +426,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
         resultPopup.SetActive(false);
         Time.timeScale = MatchSpeed.Normal;
         currentMoment = null;
+        lastMomentEndTime = Time.time;
 
         if (matchActive)
         {
@@ -274,28 +435,28 @@ public class MatchDecisiveMomentController : MonoBehaviour
         }
     }
 
-    private PlayerData FindGoalkeeper(List<PlayerData> players)
+    private PlayerData FindGoalkeeper(List<PlayerData> players, string formation)
     {
-        foreach (PlayerData player in players)
+        for (int i = 0; i < players.Count; i++)
         {
-            if (MatchPitchLayout.GetCategory(player.position) == "GK")
+            if (MatchPitchLayout.GetCategoryForIndex(players[i].position, formation, i) == "GK")
             {
-                return player;
+                return players[i];
             }
         }
 
         return players[0];
     }
 
-    private PlayerData PickDefender(List<PlayerData> players)
+    private PlayerData PickDefender(List<PlayerData> players, string formation)
     {
         List<PlayerData> defenders = new List<PlayerData>();
 
-        foreach (PlayerData player in players)
+        for (int i = 0; i < players.Count; i++)
         {
-            if (MatchPitchLayout.GetCategory(player.position) == "DEF")
+            if (MatchPitchLayout.GetCategoryForIndex(players[i].position, formation, i) == "DEF")
             {
-                defenders.Add(player);
+                defenders.Add(players[i]);
             }
         }
 

@@ -12,21 +12,28 @@ public static class MatchPitchLayout
     private const float MidfieldY = -1f;
     private const float AttackY = 5f;
 
-    public static List<Vector2> GetPositions(List<PlayerData> startingEleven, bool mirrored)
+    // formation drives which row each starting-XI INDEX belongs to (same
+    // slot order FormationFieldManager/TeamRatingMath use - index 0 is
+    // always the real goalkeeper there) instead of re-deriving a row from
+    // each player's own position string. That re-derivation was the cause
+    // of "the GK isn't in his actual place": if the manager ever put a
+    // non-keeper into the keeper's slot, this used to draw them in the
+    // defensive line instead and leave the goal empty.
+    public static List<Vector2> GetPositions(List<PlayerData> startingEleven, string formation, bool mirrored)
     {
         List<PlayerData> goalkeepers = new List<PlayerData>();
         List<PlayerData> defenders = new List<PlayerData>();
         List<PlayerData> midfielders = new List<PlayerData>();
         List<PlayerData> attackers = new List<PlayerData>();
 
-        foreach (PlayerData player in startingEleven)
+        for (int i = 0; i < startingEleven.Count; i++)
         {
-            switch (GetCategory(player.position))
+            switch (GetCategoryForIndex(startingEleven[i].position, formation, i))
             {
-                case "GK": goalkeepers.Add(player); break;
-                case "DEF": defenders.Add(player); break;
-                case "MID": midfielders.Add(player); break;
-                default: attackers.Add(player); break;
+                case "GK": goalkeepers.Add(startingEleven[i]); break;
+                case "DEF": defenders.Add(startingEleven[i]); break;
+                case "MID": midfielders.Add(startingEleven[i]); break;
+                default: attackers.Add(startingEleven[i]); break;
             }
         }
 
@@ -89,6 +96,22 @@ public static class MatchPitchLayout
 
             positionByPlayer[players[i]] = new Vector2(x, y);
         }
+    }
+
+    // Slot-driven category for a starting-XI index, falling back to the
+    // player's own position string only if the formation/index don't
+    // resolve to a known slot (e.g. a synthesized opponent roster shape
+    // that doesn't match its declared formation's slot count).
+    public static string GetCategoryForIndex(string position, string formation, int index)
+    {
+        TeamRatingMath.RatingSlot[] slots = TeamRatingMath.GetFormationRatingSlots(formation);
+
+        if (index >= 0 && index < slots.Length)
+        {
+            return slots[index].category;
+        }
+
+        return GetCategory(position);
     }
 
     public static string GetCategory(string position)

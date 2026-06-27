@@ -44,6 +44,24 @@ public class MatchPitchController : MonoBehaviour
     private Coroutine shakeRoutine;
     private MatchSetup currentSetup;
 
+    // Where the ball actually was last tick, and who held it - so the next
+    // carrier is chosen relative to that instead of a fresh pitch-wide
+    // random pick every tick. Without this, the ball could "teleport" from
+    // one box to the other in a single tick with no visual passing chain.
+    private Vector2? lastBallPosition;
+    private MatchSide? lastPossessingSide;
+
+    // The last 2 carriers, tracked separately per side (index spaces don't
+    // overlap between teams). Excluded from the next same-side pass pick so
+    // the ball can't immediately bounce straight back to whoever just had
+    // it - without this, two nearby players can end up passing back and
+    // forth to each other forever since they're often each other's closest
+    // neighbor on every single tick.
+    private int lastCarrierIndexHome = -1;
+    private int prevCarrierIndexHome = -1;
+    private int lastCarrierIndexAway = -1;
+    private int prevCarrierIndexAway = -1;
+
     // Which side is currently mirrored (attacking toward -Y instead of +Y).
     // Flipped at half-time so both teams swap ends, like real football.
     private bool homeMirrored;
@@ -54,6 +72,14 @@ public class MatchPitchController : MonoBehaviour
     // reads this so the decision panel always matches who has the ball.
     public MatchSide? CurrentPossessingSide { get; private set; }
     public PlayerData CurrentCarrier { get; private set; }
+
+    // Live field context for the decisive-moment system: how close the
+    // carrier is to the goal they're attacking (0 = own box, 1 = right on
+    // the opponent's goal line) and how many defenders are currently
+    // converging on them - so decisions reflect what's actually happening
+    // on the pitch instead of a context-free random trigger.
+    public float CurrentAttackProgress01 { get; private set; }
+    public int CurrentNearbyDefenderCount { get; private set; }
 
     private void OnEnable()
     {
@@ -74,15 +100,25 @@ public class MatchPitchController : MonoBehaviour
         currentSetup = setup;
         CurrentPossessingSide = null;
         CurrentCarrier = null;
+        lastBallPosition = null;
+        lastPossessingSide = null;
+        lastCarrierIndexHome = -1;
+        prevCarrierIndexHome = -1;
+        lastCarrierIndexAway = -1;
+        prevCarrierIndexAway = -1;
 
         pitchPixelSize = pitchPanel.rect.size;
         pitchRestPosition = pitchPanel.anchoredPosition;
 
-        homeBasePositions = MatchPitchLayout.GetPositions(setup.home.startingEleven, homeMirrored);
-        awayBasePositions = MatchPitchLayout.GetPositions(setup.away.startingEleven, awayMirrored);
+        // The away roster is always synthesized in a fixed 4-3-3 shape
+        // (NationalTeamOpponentBuilder) regardless of the opponent's
+        // declared preferred formation, so its layout/category lookup uses
+        // that real shape rather than the (cosmetic-only) label.
+        homeBasePositions = MatchPitchLayout.GetPositions(setup.home.startingEleven, setup.home.formation, homeMirrored);
+        awayBasePositions = MatchPitchLayout.GetPositions(setup.away.startingEleven, "4-3-3", awayMirrored);
 
-        SpawnTeam(setup.home.startingEleven, homeBasePositions, homeColor, homeTokens, homeCategories);
-        SpawnTeam(setup.away.startingEleven, awayBasePositions, awayColor, awayTokens, awayCategories);
+        SpawnTeam(setup.home.startingEleven, homeBasePositions, homeColor, homeTokens, homeCategories, setup.home.formation);
+        SpawnTeam(setup.away.startingEleven, awayBasePositions, awayColor, awayTokens, awayCategories, "4-3-3");
 
         SpawnGoal(new Vector2(0f, -9.5f));
         SpawnGoal(new Vector2(0f, 9.5f));
@@ -93,11 +129,11 @@ public class MatchPitchController : MonoBehaviour
         ballToken.SetPositionImmediate(Vector2.zero);
     }
 
-    private void SpawnTeam(List<PlayerData> players, List<Vector2> basePositions, Color color, List<MatchDotToken> tokens, List<string> categories)
+    private void SpawnTeam(List<PlayerData> players, List<Vector2> basePositions, Color color, List<MatchDotToken> tokens, List<string> categories, string formation)
     {
         for (int i = 0; i < players.Count; i++)
         {
-            string category = MatchPitchLayout.GetCategory(players[i].position);
+            string category = MatchPitchLayout.GetCategoryForIndex(players[i].position, formation, i);
 
             GameObject dotObject = MatchPitchVisuals.CreateDot(pitchPanel, players[i].playerName, color, dotSize, i + 1);
             MatchDotToken token = dotObject.GetComponent<MatchDotToken>();
@@ -139,8 +175,28 @@ public class MatchPitchController : MonoBehaviour
         awayMirrored = !awayMirrored;
     }
 
+    // Kickoff restart after a goal: snap the ball back to the center spot
+    // and clear all possession-continuity state, so the next tick doesn't
+    // try to "pass" from inside the goal it was just scored in.
+    private void ResetBallToCenter()
+    {
+        if (ballToken != null)
+        {
+            ballToken.SetPositionImmediate(MatchPitchVisuals.PitchToAnchoredPosition(Vector2.zero, pitchPixelSize));
+        }
+
+        lastBallPosition = Vector2.zero;
+        lastPossessingSide = null;
+        lastCarrierIndexHome = -1;
+        prevCarrierIndexHome = -1;
+        lastCarrierIndexAway = -1;
+        prevCarrierIndexAway = -1;
+    }
+
     private void HandleGoalShake(GoalEvent goalEvent)
     {
+        ResetBallToCenter();
+
         if (shakeRoutine != null)
         {
             StopCoroutine(shakeRoutine);
@@ -197,12 +253,38 @@ public class MatchPitchController : MonoBehaviour
         List<Vector2> attackingTargets = BuildTacticalTargets(attackingTokens, attackingBase, attackingCategories, attackPush);
         List<Vector2> defendingTargets = BuildTacticalTargets(defendingTokens, defendingBase, defendingCategories, defendPush);
 
-        int carrierIndex = PickCarrierIndex(attackingCategories);
+        bool sameSideAsLastTick = lastPossessingSide.HasValue && lastPossessingSide.Value == possessingSide;
+
+        int recentCarrier = homeAttacking ? lastCarrierIndexHome : lastCarrierIndexAway;
+        int recentCarrierBefore = homeAttacking ? prevCarrierIndexHome : prevCarrierIndexAway;
+
+        int carrierIndex = PickCarrierIndex(
+            attackingTargets,
+            attackingCategories,
+            sameSideAsLastTick,
+            attackSign,
+            sameSideAsLastTick ? recentCarrier : -1,
+            sameSideAsLastTick ? recentCarrierBefore : -1
+        );
         Vector2 carrierPosition = attackingTargets[carrierIndex];
+
+        if (homeAttacking)
+        {
+            prevCarrierIndexHome = lastCarrierIndexHome;
+            lastCarrierIndexHome = carrierIndex;
+        }
+        else
+        {
+            prevCarrierIndexAway = lastCarrierIndexAway;
+            lastCarrierIndexAway = carrierIndex;
+        }
 
         CurrentPossessingSide = possessingSide;
         List<PlayerData> attackingPlayers = homeAttacking ? currentSetup.home.startingEleven : currentSetup.away.startingEleven;
         CurrentCarrier = attackingPlayers[carrierIndex];
+
+        CurrentAttackProgress01 = Mathf.Clamp01((carrierPosition.y * attackSign + 9.5f) / 19f);
+        CurrentNearbyDefenderCount = CountNearbyDefenders(defendingTargets, defendingCategories, carrierPosition);
 
         ApplySupportShift(attackingTargets, carrierIndex, carrierPosition);
         ApplyPressShift(defendingTargets, defendingCategories, carrierPosition);
@@ -221,6 +303,32 @@ public class MatchPitchController : MonoBehaviour
         float forwardNudge = attackSign * 0.4f;
         Vector2 ballPitchPosition = carrierPosition + new Vector2(0f, forwardNudge);
         ballToken.SetTargetPosition(MatchPitchVisuals.PitchToAnchoredPosition(ballPitchPosition, pitchPixelSize));
+
+        lastBallPosition = ballPitchPosition;
+        lastPossessingSide = possessingSide;
+    }
+
+    // How many defenders (any outfield role, goalkeeper excluded) are
+    // standing within "challenge range" of the ball carrier right now.
+    private int CountNearbyDefenders(List<Vector2> defendingTargets, List<string> defendingCategories, Vector2 carrierPosition)
+    {
+        const float challengeRange = 2.6f;
+        int count = 0;
+
+        for (int i = 0; i < defendingTargets.Count; i++)
+        {
+            if (defendingCategories[i] == "GK")
+            {
+                continue;
+            }
+
+            if (Vector2.Distance(defendingTargets[i], carrierPosition) <= challengeRange)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private List<Vector2> BuildTacticalTargets(List<MatchDotToken> tokens, List<Vector2> basePositions, List<string> categories, float yOffset)
@@ -353,9 +461,98 @@ public class MatchPitchController : MonoBehaviour
         }
     }
 
+    [Header("Possession continuity")]
+    [Tooltip("How far (pitch units) a short pass can realistically travel to the next carrier when the same side keeps the ball.")]
+    public float passRange = 7f;
+    [Tooltip("How many of the nearest teammates within passRange are considered as the next pass target.")]
+    public int passCandidateCount = 6;
+
+    // Same side keeps the ball: the next carrier is one of the nearby
+    // teammates (a short pass), not a fresh pitch-wide random pick - so the
+    // ball visibly moves through nearby players instead of teleporting.
+    // Side just changed (a turnover): the new carrier is whoever on this
+    // team is actually closest to where the ball was won, not a random
+    // pick anywhere on the pitch. Only falls back to the old pure-random
+    // weighted pick when there's no previous ball position yet (kickoff).
+    private int PickCarrierIndex(
+        List<Vector2> targets,
+        List<string> categories,
+        bool sameSideAsLastTick,
+        float attackSign,
+        int excludeRecent1,
+        int excludeRecent2
+    )
+    {
+        if (!lastBallPosition.HasValue)
+        {
+            return PickWeightedRandomIndex(categories);
+        }
+
+        if (!sameSideAsLastTick)
+        {
+            List<int> nearest = FindNearestIndices(targets, lastBallPosition.Value, -1, 1);
+            return nearest.Count > 0 ? nearest[0] : PickWeightedRandomIndex(categories);
+        }
+
+        List<int> candidates = FindNearestIndices(targets, lastBallPosition.Value, -1, passCandidateCount);
+        candidates.RemoveAll(index => Vector2.Distance(targets[index], lastBallPosition.Value) > passRange);
+
+        // Don't pass straight back to whoever just had it (or the carrier
+        // before that) - unless that leaves no one else to pass to at all.
+        List<int> freshCandidates = new List<int>(candidates);
+        freshCandidates.RemoveAll(index => index == excludeRecent1 || index == excludeRecent2);
+
+        if (freshCandidates.Count > 0)
+        {
+            candidates = freshCandidates;
+        }
+
+        if (candidates.Count == 0)
+        {
+            return PickWeightedRandomIndex(categories);
+        }
+
+        float totalWeight = 0f;
+        float[] weights = new float[candidates.Count];
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            Vector2 candidatePosition = targets[candidates[i]];
+            float distance = Vector2.Distance(candidatePosition, lastBallPosition.Value);
+            float distanceFalloff = Mathf.Clamp01(1f - distance / passRange);
+
+            // Passes toward the goal being attacked are weighted higher
+            // than sideways/backward ones, so possession tends to progress
+            // instead of shuffling between the same couple of players.
+            float forwardProgress = (candidatePosition.y - lastBallPosition.Value.y) * attackSign;
+            float forwardBias = Mathf.Clamp(1f + forwardProgress * 0.2f, 0.4f, 2f);
+
+            weights[i] = GetCarrierWeight(categories[candidates[i]]) * (0.3f + distanceFalloff) * forwardBias;
+            totalWeight += weights[i];
+        }
+
+        float pick = Random.Range(0f, totalWeight);
+        float cumulative = 0f;
+
+        for (int i = 0; i < weights.Length; i++)
+        {
+            cumulative += weights[i];
+
+            if (pick < cumulative)
+            {
+                return candidates[i];
+            }
+        }
+
+        return candidates[candidates.Count - 1];
+    }
+
     // Weighted pick: midfielders and attackers carry the ball far more
-    // often than defenders, goalkeepers rarely (just after a save).
-    private int PickCarrierIndex(List<string> categories)
+    // often than defenders, goalkeepers rarely (just after a save). Used
+    // only as a cold-start fallback now (kickoff, or no valid nearby pass
+    // target) - see PickCarrierIndex above for the normal, position-aware
+    // path.
+    private int PickWeightedRandomIndex(List<string> categories)
     {
         float totalWeight = 0f;
         float[] weights = new float[categories.Count];

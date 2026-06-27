@@ -14,9 +14,12 @@ public enum DecisiveAction
     Shoot,
     Pass,
     Dribble,
+    ThroughBall,
+    LongBall,
     Tackle,
     Block,
-    Press
+    Press,
+    Cover
 }
 
 public class DecisiveMoment
@@ -36,6 +39,14 @@ public class DecisiveMoment
     public int opponentTeamDefenseRating;
 
     public float attackBoost = 1f;
+
+    // Live field context, read off the pitch the instant the moment
+    // triggers: 0 = own box, 1 = right on the goal being attacked, and how
+    // many defenders are currently within challenge range of the carrier.
+    // These make the decision (and its odds) reflect what's actually
+    // happening, instead of every Shoot/Tackle/etc. having a fixed chance.
+    public float fieldProgress = 0.5f;
+    public int nearbyDefenderCount;
 
     // Scales every "opponent side" stat the resolver checks against,
     // without ever mutating the shared PlayerData ScriptableObject. >1

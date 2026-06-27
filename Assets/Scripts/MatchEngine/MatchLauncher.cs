@@ -93,12 +93,25 @@ public class MatchLauncher : MonoBehaviour
 
         teamManager.substitutionsUsed = 0;
 
-        TeamMatchRatings home = MatchSetupBuilder.BuildRatings("Jordan", teamManager.startingEleven);
+        string formation = GameProgressManager.Instance != null && !string.IsNullOrWhiteSpace(GameProgressManager.Instance.CurrentFormation)
+            ? GameProgressManager.Instance.CurrentFormation
+            : "4-3-3";
+        TeamTrainingState trainingState = TrainingManager.Instance != null ? TrainingManager.Instance.TeamState : null;
+
+        TeamMatchRatings home = MatchSetupBuilder.BuildRatings("Jordan", teamManager.startingEleven, formation, trainingState);
         TeamMatchRatings away = NationalTeamOpponentBuilder.BuildOpponentRatings(opponentTeam);
 
         MatchSetup setup = new MatchSetup(home, away);
 
         MatchSession.GetOrCreate().SetPendingSetup(setup);
+
+        // Lock in the lineup/formation on disk right before kickoff - if the
+        // app closes mid-match, the squad the player actually picked is what
+        // comes back, not whatever was last saved at squad confirmation.
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.SaveCurrentState();
+        }
 
         SceneManager.LoadScene(matchDaySceneName);
     }

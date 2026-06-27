@@ -9,14 +9,14 @@ public class MatchPreviewDiagram : MonoBehaviour
     public Color dotColor = Color.white;
     public float dotSize = 18f;
 
-    public void Render(List<PlayerData> startingEleven, bool mirrored)
+    public void Render(List<PlayerData> startingEleven, string formation, bool mirrored)
     {
         for (int i = diagramPanel.childCount - 1; i >= 0; i--)
         {
             Destroy(diagramPanel.GetChild(i).gameObject);
         }
 
-        List<Vector2> positions = MatchPitchLayout.GetPositions(startingEleven, mirrored);
+        List<Vector2> positions = MatchPitchLayout.GetPositions(startingEleven, formation, mirrored);
         Vector2 pitchPixelSize = diagramPanel.rect.size;
 
         for (int i = 0; i < startingEleven.Count; i++)

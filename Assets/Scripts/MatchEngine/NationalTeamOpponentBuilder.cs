@@ -26,6 +26,7 @@ public static class NationalTeamOpponentBuilder
 
         return new TeamMatchRatings(teamName, roster, team.attack, team.midfield, team.defense)
         {
+            formation = string.IsNullOrWhiteSpace(team.preferredFormation) ? "4-3-3" : team.preferredFormation,
             flag = team.flag
         };
     }
