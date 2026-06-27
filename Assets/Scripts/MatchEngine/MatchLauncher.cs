@@ -1,6 +1,8 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 // Lives in FormationScene. Hook a "Play Match" button to LaunchMatch():
 // builds the MatchSetup from the confirmed starting XI plus the opponent's
@@ -20,6 +22,12 @@ public class MatchLauncher : MonoBehaviour
     public GameObject playMatchButton;
     public GameObject continueSecondHalfButton;
 
+    [Tooltip("Repurposed into the \"Continue 2nd Half\" button during a half-time formation edit, since there is no separate continue button authored in the scene - you can't leave to train mid-match anyway.")]
+    public Button trainingButton;
+
+    [Tooltip("Hidden during a half-time formation edit - you can't leave to the home screen mid-match.")]
+    public GameObject homeButton;
+
     private void Start()
     {
         bool isHalftimeEditing = MatchSession.GetOrCreate().IsHalftimeEditing;
@@ -29,9 +37,34 @@ public class MatchLauncher : MonoBehaviour
             playMatchButton.SetActive(!isHalftimeEditing);
         }
 
+        if (homeButton != null)
+        {
+            homeButton.SetActive(!isHalftimeEditing);
+        }
+
         if (continueSecondHalfButton != null)
         {
             continueSecondHalfButton.SetActive(isHalftimeEditing);
+        }
+
+        if (trainingButton != null && isHalftimeEditing)
+        {
+            // Replace the whole UnityEvent (not just AddListener) so the
+            // Inspector-wired "open Training scene" persistent call is
+            // dropped too - otherwise both it and ContinueSecondHalf would
+            // fire on click. This only ever runs for this additive,
+            // halftime-only load of the scene; a normal single-scene load
+            // of FormationScene starts with the original persistent call
+            // intact, since that change never gets serialized back to disk.
+            trainingButton.onClick = new Button.ButtonClickedEvent();
+            trainingButton.onClick.AddListener(ContinueSecondHalf);
+
+            TMP_Text label = trainingButton.GetComponentInChildren<TMP_Text>();
+
+            if (label != null)
+            {
+                label.text = "CONTINUE";
+            }
         }
     }
 

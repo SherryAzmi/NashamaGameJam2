@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,6 +23,9 @@ public class MatchPenaltyController : MonoBehaviour
     public GameObject resultPopup;
     public TMP_Text resultPopupText;
 
+    [Tooltip("Optional. Shows a running make/miss tally for each side as the shootout proceeds.")]
+    public TMP_Text kickTallyText;
+
     public float resultPopupDuration = 1.2f;
 
     private MatchSetup setup;
@@ -31,6 +35,9 @@ public class MatchPenaltyController : MonoBehaviour
     private const int RegulationRounds = 5;
     private System.Action<int, int> onComplete;
 
+    private readonly List<bool> homeKicks = new List<bool>();
+    private readonly List<bool> awayKicks = new List<bool>();
+
     public void BeginShootout(MatchSetup matchSetup, System.Action<int, int> onShootoutComplete)
     {
         setup = matchSetup;
@@ -38,10 +45,13 @@ public class MatchPenaltyController : MonoBehaviour
         homeScore = 0;
         awayScore = 0;
         round = 1;
+        homeKicks.Clear();
+        awayKicks.Clear();
 
         panel.SetActive(true);
         resultPopup.SetActive(false);
 
+        UpdateKickTally();
         StartHomeKick();
     }
 
@@ -76,6 +86,9 @@ public class MatchPenaltyController : MonoBehaviour
             homeScore++;
         }
 
+        homeKicks.Add(scored);
+        UpdateKickTally();
+
         ShowResult(scored ? shooter.playerName + " SCORES!" : keeper.playerName + " SAVES IT!", StartAwayKick);
     }
 
@@ -92,6 +105,9 @@ public class MatchPenaltyController : MonoBehaviour
         {
             awayScore++;
         }
+
+        awayKicks.Add(scored);
+        UpdateKickTally();
 
         ShowResult(scored ? shooter.playerName + " SCORES!" : keeper.playerName + " SAVES IT!", AfterRound);
     }
@@ -152,6 +168,30 @@ public class MatchPenaltyController : MonoBehaviour
         {
             scoreText.text = "PENALTIES: JORDAN " + homeScore + " - " + awayScore + " " + setup.away.teamName.ToUpperInvariant();
         }
+    }
+
+    private void UpdateKickTally()
+    {
+        if (kickTallyText == null)
+        {
+            return;
+        }
+
+        kickTallyText.text =
+            "JORDAN: " + KickTallyLine(homeKicks) + "\n" +
+            setup.away.teamName.ToUpperInvariant() + ": " + KickTallyLine(awayKicks);
+    }
+
+    private string KickTallyLine(List<bool> kicks)
+    {
+        StringBuilder builder = new StringBuilder();
+
+        foreach (bool scored in kicks)
+        {
+            builder.Append(scored ? "● " : "○ ");
+        }
+
+        return builder.ToString();
     }
 
     private PlayerData PickShooter(List<PlayerData> players)

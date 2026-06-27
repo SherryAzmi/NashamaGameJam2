@@ -22,6 +22,8 @@ public class MatchDayController : MonoBehaviour
     public TMP_Text awayPlayerListText;
     public MatchPreviewDiagram homePreviewDiagram;
     public MatchPreviewDiagram awayPreviewDiagram;
+    public Image homeFlagImage;
+    public Image awayFlagImage;
     public Button kickOffButton;
 
     [Header("Match HUD")]
@@ -67,6 +69,8 @@ public class MatchDayController : MonoBehaviour
     private int homeScore;
     private int awayScore;
     private bool? penaltyHomeWon;
+    private int? penaltyHomeScore;
+    private int? penaltyAwayScore;
     private readonly System.Collections.Generic.List<string> logLines = new System.Collections.Generic.List<string>();
     private readonly System.Collections.Generic.List<GoalEvent> liveGoals = new System.Collections.Generic.List<GoalEvent>();
 
@@ -104,7 +108,7 @@ public class MatchDayController : MonoBehaviour
         if (CampaignState.Instance != null)
         {
             bool homeWon = penaltyHomeWon ?? (homeScore > awayScore);
-            CampaignState.Instance.RecordResult(homeScore, awayScore, homeWon);
+            CampaignState.Instance.RecordResult(homeScore, awayScore, homeWon, penaltyHomeScore, penaltyAwayScore);
         }
 
         SceneManager.LoadScene(campaignSceneName);
@@ -159,6 +163,20 @@ public class MatchDayController : MonoBehaviour
 
         homePreviewDiagram.Render(setup.home.startingEleven, false);
         awayPreviewDiagram.Render(setup.away.startingEleven, true);
+
+        SetFlag(homeFlagImage, setup.home.flag);
+        SetFlag(awayFlagImage, setup.away.flag);
+    }
+
+    private void SetFlag(Image image, Sprite flag)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.sprite = flag;
+        image.enabled = flag != null;
     }
 
     private string FormatStats(TeamMatchRatings ratings)
@@ -187,6 +205,8 @@ public class MatchDayController : MonoBehaviour
         homeScore = 0;
         awayScore = 0;
         penaltyHomeWon = null;
+        penaltyHomeScore = null;
+        penaltyAwayScore = null;
         logLines.Clear();
         liveGoals.Clear();
         UpdateScoreText();
@@ -302,10 +322,12 @@ public class MatchDayController : MonoBehaviour
         ShowFullTimeResult(string.Empty);
     }
 
-    private void ShowFullTimeResultAfterPenalties(int penaltyHomeScore, int penaltyAwayScore)
+    private void ShowFullTimeResultAfterPenalties(int penaltyHomeScoreResult, int penaltyAwayScoreResult)
     {
-        penaltyHomeWon = penaltyHomeScore > penaltyAwayScore;
-        ShowFullTimeResult($"\nPENALTIES: {penaltyHomeScore} - {penaltyAwayScore}");
+        penaltyHomeWon = penaltyHomeScoreResult > penaltyAwayScoreResult;
+        penaltyHomeScore = penaltyHomeScoreResult;
+        penaltyAwayScore = penaltyAwayScoreResult;
+        ShowFullTimeResult($"\nPENALTIES: {penaltyHomeScoreResult} - {penaltyAwayScoreResult}");
     }
 
     private void ShowFullTimeResult(string penaltyLine)

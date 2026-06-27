@@ -10,11 +10,30 @@ public class GameProgressManager : MonoBehaviour
     // Coach name can safely stay after the app closes.
     public string CoachName { get; private set; }
 
-    // These are SESSION values. They survive scene changes, but reset when a
-    // brand-new Play session starts. A full disk save for squad/training comes
-    // later once PlayerData has stable player IDs.
+    // HasSelectedTeam is restored from disk only via ApplyLoadedSquadFlag,
+    // called by TeamManager right after it finishes restoring the actual
+    // squad lists - never set directly from a save file in Awake() here,
+    // so the flag and the squad it depends on always change together.
     public bool HasSelectedTeam { get; private set; }
     public string CurrentFormation { get; private set; } = "4-3-3";
+
+    // Ensures GameProgressManager exists from the very first scene loaded,
+    // regardless of whether that is IntroScene or any other scene (e.g.
+    // testing a later scene directly in the Editor). Without this, any
+    // scene entered before IntroScene would see Instance == null forever,
+    // which silently breaks HomeSceneButton's lock checks (they default to
+    // "team not selected" when Instance is null).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Bootstrap()
+    {
+        if (Instance != null)
+        {
+            return;
+        }
+
+        GameObject managerObject = new GameObject("GameProgressManager");
+        managerObject.AddComponent<GameProgressManager>();
+    }
 
     private void Awake()
     {
@@ -49,6 +68,14 @@ public class GameProgressManager : MonoBehaviour
     public void MarkTeamSelected()
     {
         HasSelectedTeam = true;
+    }
+
+    // Called only by TeamManager, immediately after it has restored the
+    // actual squad lists from the save file - see the comment on
+    // HasSelectedTeam above.
+    public void ApplyLoadedSquadFlag(bool hasSelectedTeam)
+    {
+        HasSelectedTeam = hasSelectedTeam;
     }
 
     public void SetCurrentFormation(string formation)

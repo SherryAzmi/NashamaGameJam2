@@ -24,7 +24,10 @@ public static class NationalTeamOpponentBuilder
         List<PlayerData> roster = GenerateRoster(team);
         string teamName = string.IsNullOrWhiteSpace(team.teamName) ? team.name : team.teamName;
 
-        return new TeamMatchRatings(teamName, roster, team.attack, team.midfield, team.defense);
+        return new TeamMatchRatings(teamName, roster, team.attack, team.midfield, team.defense)
+        {
+            flag = team.flag
+        };
     }
 
     private static List<PlayerData> GenerateRoster(NationalTeamData team)

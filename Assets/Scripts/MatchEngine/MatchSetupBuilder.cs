@@ -7,13 +7,16 @@ using UnityEngine;
 // NationalTeamData assets via NationalTeamOpponentBuilder.
 public static class MatchSetupBuilder
 {
-    public static TeamMatchRatings BuildRatings(string teamName, List<PlayerData> startingEleven)
+    public static TeamMatchRatings BuildRatings(string teamName, List<PlayerData> startingEleven, Sprite flag = null)
     {
         int attack = AverageStat(startingEleven, p => (p.speed + p.shoot * 2) / 3);
         int defense = AverageStat(startingEleven, p => (p.defense * 2 + p.speed) / 3);
         int midfield = AverageStat(startingEleven, p => (p.speed + p.shoot + p.defense) / 3);
 
-        return new TeamMatchRatings(teamName, startingEleven, attack, midfield, defense);
+        return new TeamMatchRatings(teamName, startingEleven, attack, midfield, defense)
+        {
+            flag = flag != null ? flag : CampaignState.Instance != null ? CampaignState.Instance.GetJordanFlag() : null
+        };
     }
 
     private static int AverageStat(List<PlayerData> players, System.Func<PlayerData, int> selector)

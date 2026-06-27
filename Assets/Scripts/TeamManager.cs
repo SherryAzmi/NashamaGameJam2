@@ -15,6 +15,7 @@ public class TeamManager : MonoBehaviour
     [HideInInspector] public int substitutionsUsed = 0;
 
     private static TeamManager instance;
+    public static TeamManager Instance => instance;
 
     public PlayerDatabase database;
 
@@ -50,6 +51,7 @@ public class TeamManager : MonoBehaviour
     private int maxAttackers = 7;
 
     private bool squadConfirmed = false;
+    public bool SquadConfirmed => squadConfirmed;
 
     [Serializable]
     public class ClubVisual
@@ -70,6 +72,64 @@ public class TeamManager : MonoBehaviour
 
         instance = this;
         DontDestroyOnLoad(gameObject);
+
+        RestoreFromSave();
+    }
+
+    // Restores the confirmed squad from the shared save snapshot, if any.
+    // The squad list and the "team selected" flag are restored together in
+    // this one method so GameProgressManager never sees one without the
+    // other (the exact split this project's save design explicitly avoids).
+    private void RestoreFromSave()
+    {
+        GameSaveData save = SaveManager.PendingLoadData;
+
+        if (save == null || database == null)
+        {
+            return;
+        }
+
+        SquadSaveData data = save.squad;
+
+        selectedPlayers = ResolvePlayers(data.selectedPlayerNames);
+        startingEleven = ResolvePlayers(data.startingElevenNames);
+        benchPlayers = ResolvePlayers(data.benchPlayerNames);
+        formationInitialized = data.formationInitialized;
+        substitutionsUsed = data.substitutionsUsed;
+        squadConfirmed = data.squadConfirmed;
+
+        if (GameProgressManager.Instance != null)
+        {
+            GameProgressManager.Instance.ApplyLoadedSquadFlag(squadConfirmed);
+        }
+    }
+
+    private List<PlayerData> ResolvePlayers(List<string> playerNames)
+    {
+        List<PlayerData> resolved = new List<PlayerData>();
+
+        foreach (string playerName in playerNames)
+        {
+            PlayerData player = database.players.Find(p => p != null && p.name == playerName);
+
+            if (player != null)
+            {
+                resolved.Add(player);
+            }
+        }
+
+        return resolved;
+    }
+
+    // Called by SaveManager to fill in this manager's section of the save.
+    public void WriteSaveData(SquadSaveData data)
+    {
+        data.selectedPlayerNames = selectedPlayers.ConvertAll(p => p.name);
+        data.startingElevenNames = startingEleven.ConvertAll(p => p.name);
+        data.benchPlayerNames = benchPlayers.ConvertAll(p => p.name);
+        data.formationInitialized = formationInitialized;
+        data.substitutionsUsed = substitutionsUsed;
+        data.squadConfirmed = squadConfirmed;
     }
 
     private void Start()
@@ -645,7 +705,16 @@ public class TeamManager : MonoBehaviour
             trainingManager.ClearActiveTrainingForNewSquad();
         }
 
-        GameProgressManager.Instance.MarkTeamSelected();
+        if (GameProgressManager.Instance != null)
+        {
+            GameProgressManager.Instance.MarkTeamSelected();
+        }
+
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.SaveCurrentState();
+        }
+
         SceneManager.LoadScene("HomeScene");
     }
 

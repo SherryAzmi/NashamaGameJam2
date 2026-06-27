@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 [System.Serializable]
 public class TeamMatchRatings
@@ -10,6 +11,11 @@ public class TeamMatchRatings
     public int midfield;
     public int defense;
     public int power;
+
+    // Null until set by MatchSetupBuilder (home/Jordan) or
+    // NationalTeamOpponentBuilder (away) - the flag sprite from the source
+    // NationalTeamData, threaded through for the MatchDay preview UI.
+    public Sprite flag;
 
     public TeamMatchRatings(string teamName, List<PlayerData> startingEleven, int attack, int midfield, int defense)
     {

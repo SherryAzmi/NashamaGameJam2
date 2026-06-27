@@ -5,6 +5,9 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class TrainingManager : MonoBehaviour
 {
+    private static TrainingManager instance;
+    public static TrainingManager Instance => instance;
+
     private const int MaxIndividualSlots = 2;
     private const int MaxPlayerBonus = 4;
     private const int MaxUnitBonus = 6;
@@ -69,8 +72,18 @@ public class TrainingManager : MonoBehaviour
 
  private void Awake()
 {
+    if (instance != null && instance != this)
+    {
+        Destroy(gameObject);
+        return;
+    }
+
+    instance = this;
+    DontDestroyOnLoad(gameObject);
+
     ResolveTeamManager();
     ResetActiveTrainingForNewPlay();
+    RestoreFromSave();
 }
 [RuntimeInitializeOnLoadMethod(
     RuntimeInitializeLoadType.BeforeSceneLoad
@@ -187,6 +200,110 @@ private void ResetActiveTrainingForNewPlay()
 
         developmentPoints += amount;
         NotifyTrainingStateChanged();
+
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.SaveCurrentState();
+        }
+    }
+
+    // Restores permanent training progress from the shared save snapshot.
+    // In-flight active jobs are intentionally not restored - they are
+    // session-only, same as ResetActiveTrainingForNewPlay already assumes.
+    private void RestoreFromSave()
+    {
+        GameSaveData save = SaveManager.PendingLoadData;
+
+        if (save == null)
+        {
+            return;
+        }
+
+        TrainingSaveData data = save.training;
+
+        developmentPoints = data.developmentPoints;
+        currentGameHour = data.currentGameHour > 0 ? data.currentGameHour : currentGameHour;
+        currentFormation = string.IsNullOrWhiteSpace(data.currentFormation)
+            ? currentFormation
+            : data.currentFormation;
+        legacyBonusMigrationDone = data.legacyBonusMigrationDone;
+        teamTrainingState = data.teamTrainingState ?? new TeamTrainingState();
+
+        playerStates.Clear();
+
+        foreach (PlayerTrainingStateSave savedState in data.playerStates)
+        {
+            PlayerData player = ResolvePlayerByName(savedState.playerName);
+
+            if (player == null)
+            {
+                continue;
+            }
+
+            playerStates.Add(new PlayerTrainingState
+            {
+                player = player,
+                speedBonus = savedState.speedBonus,
+                shootBonus = savedState.shootBonus,
+                defenseBonus = savedState.defenseBonus,
+                finishingSessions = savedState.finishingSessions,
+                speedSessions = savedState.speedSessions,
+                defenseSessions = savedState.defenseSessions,
+                goalkeeperSessions = savedState.goalkeeperSessions
+            });
+        }
+
+        NotifyTrainingStateChanged();
+    }
+
+    private PlayerData ResolvePlayerByName(string playerName)
+    {
+        if (teamManager == null || teamManager.database == null)
+        {
+            return null;
+        }
+
+        foreach (PlayerData player in teamManager.database.players)
+        {
+            if (player != null && player.name == playerName)
+            {
+                return player;
+            }
+        }
+
+        return null;
+    }
+
+    // Called by SaveManager to fill in this manager's section of the save.
+    public void WriteSaveData(TrainingSaveData data)
+    {
+        data.developmentPoints = developmentPoints;
+        data.currentGameHour = currentGameHour;
+        data.currentFormation = currentFormation;
+        data.legacyBonusMigrationDone = legacyBonusMigrationDone;
+        data.teamTrainingState = teamTrainingState;
+
+        data.playerStates.Clear();
+
+        foreach (PlayerTrainingState state in playerStates)
+        {
+            if (state.player == null)
+            {
+                continue;
+            }
+
+            data.playerStates.Add(new PlayerTrainingStateSave
+            {
+                playerName = state.player.name,
+                speedBonus = state.speedBonus,
+                shootBonus = state.shootBonus,
+                defenseBonus = state.defenseBonus,
+                finishingSessions = state.finishingSessions,
+                speedSessions = state.speedSessions,
+                defenseSessions = state.defenseSessions,
+                goalkeeperSessions = state.goalkeeperSessions
+            });
+        }
     }
 
     public void SetCurrentFormation(string formation)
@@ -866,6 +983,11 @@ private void ResetActiveTrainingForNewPlay()
         if (completedAnyJob)
         {
             Debug.Log("Training completed at " + CurrentTimeLabel);
+
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.SaveCurrentState();
+            }
         }
     }
 

@@ -7,6 +7,10 @@ public class SceneNavigator : MonoBehaviour
     {
         SceneManager.LoadScene("TrainingScene");
     }
+      public void StartGame()
+    {
+        SceneManager.LoadScene("MatchDayScene");
+    }
 
     public void ReturnToFormationScene()
     {

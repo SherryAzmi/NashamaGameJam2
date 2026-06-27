@@ -1,11 +1,15 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public enum CampaignStage
 {
     Friendlies,
-    WorldCup,
+    WorldCupDrawPending,
+    RoundOf16,
+    Quarterfinal,
+    Semifinal,
     Final,
     Completed
 }
@@ -18,60 +22,56 @@ public class FixtureRecord
     public int awayScore;
 }
 
-// One of the 3 "background" matches between the two opponents NOT playing
-// Jordan that matchday - simulated instantly (no player input) so the
-// group table reflects a real 4-team round robin, not just Jordan's record.
-public class GroupMatchRecord
-{
-    public NationalTeamData teamA;
-    public NationalTeamData teamB;
-    public bool played;
-    public int scoreA;
-    public int scoreB;
-}
-
-public class GroupStandingRow
-{
-    public string teamName;
-    public int played;
-    public int wins;
-    public int draws;
-    public int losses;
-    public int goalsFor;
-    public int goalsAgainst;
-
-    public int Points => wins * 3 + draws;
-    public int GoalDifference => goalsFor - goalsAgainst;
-}
-
 // Lives in CampaignScene, persists across the FormationScene/MatchDayScene
 // round trip (same DontDestroyOnLoad singleton pattern as TeamManager and
-// MatchSession) so fixture progress survives each match. Tracks 3 friendly
-// fixtures, then a 4-team World Cup group (Jordan + 3 opponents) played as
-// a real round robin. The top 2 in the table advance to a one-off Final;
-// if Jordan isn't top 2, the campaign ends in elimination instead. Losses
-// during Friendlies/the group stage never block progress - only finishing
-// outside the top 2 does.
+// MatchSession), and is durable across app restarts via SaveManager. Tracks
+// 6 randomly-drawn friendly fixtures, then a 16-team single-elimination
+// World Cup knockout (Round of 16 -> Quarterfinal -> Semifinal -> Final).
+// Jordan only ever plays its own match each round; every other match in
+// that round is simulated instantly the moment Jordan's match is recorded,
+// so the bracket fills in round by round.
 public class CampaignState : MonoBehaviour
 {
     private static CampaignState instance;
     public static CampaignState Instance => instance;
 
-    [Header("Friendly opponents (in order)")]
-    public NationalTeamData[] friendlyOpponents = new NationalTeamData[3];
+    private const int FriendlyCount = 6;
+    private const int KnockoutTeamCount = 16;
+    private const string JordanAssetName = "Jordan";
 
-    [Header("World Cup group opponents (in order)")]
-    public NationalTeamData[] worldCupOpponents = new NationalTeamData[3];
+    [Header("Team pool (all 48 national teams)")]
+    public NationalTeamDatabase teamDatabase;
 
     public CampaignStage Stage { get; private set; } = CampaignStage.Friendlies;
     public List<FixtureRecord> Friendlies { get; private set; }
-    public List<FixtureRecord> WorldCup { get; private set; }
-    public List<FixtureRecord> Final { get; private set; }
-    public List<GroupMatchRecord> WorldCupBackgroundMatches { get; private set; }
+    public List<BracketRound> Bracket { get; private set; } = new List<BracketRound>();
+    public List<NationalTeamData> WorldCupField { get; private set; } = new List<NationalTeamData>();
+    public int CurrentBracketRoundIndex { get; private set; }
+    public bool WorldCupDrawRevealShown { get; private set; }
+
+    // True whenever there's a bracket update (the initial draw, or a round
+    // just finished) the player hasn't seen the recap panel for yet. The
+    // hub shows the bracket panel automatically while this is true, and a
+    // permanent "View Bracket" button can also open it on demand any time.
+    public bool BracketRecapPending { get; private set; }
+
     public string CompletionMessage { get; private set; } = "";
 
     private CampaignStage launchedStage;
     private int launchedIndex = -1;
+
+    // Set right before loading FormationScene from the campaign hub, and
+    // consumed (reset to false) by FormationScene on read so it only ever
+    // reflects the most recent scene load.
+    public static bool EnteredFormationFromCampaign { get; private set; }
+
+    // Reads and clears the flag so only the very next FormationScene load sees it.
+    public static bool ConsumeEnteredFromCampaign()
+    {
+        bool value = EnteredFormationFromCampaign;
+        EnteredFormationFromCampaign = false;
+        return value;
+    }
 
     private void Awake()
     {
@@ -86,74 +86,236 @@ public class CampaignState : MonoBehaviour
 
         if (Friendlies == null)
         {
-            Friendlies = BuildFixtures(friendlyOpponents);
-            WorldCup = BuildFixtures(worldCupOpponents);
-            WorldCupBackgroundMatches = BuildBackgroundMatches(worldCupOpponents);
-        }
-    }
-
-    private List<FixtureRecord> BuildFixtures(NationalTeamData[] opponents)
-    {
-        List<FixtureRecord> list = new List<FixtureRecord>();
-
-        foreach (NationalTeamData opponent in opponents)
-        {
-            list.Add(new FixtureRecord { opponent = opponent });
-        }
-
-        return list;
-    }
-
-    // For matchday i (Jordan vs opponents[i]), the background match pairs
-    // the two opponents NOT playing Jordan that matchday.
-    private List<GroupMatchRecord> BuildBackgroundMatches(NationalTeamData[] opponents)
-    {
-        List<GroupMatchRecord> list = new List<GroupMatchRecord>();
-
-        for (int i = 0; i < opponents.Length; i++)
-        {
-            list.Add(new GroupMatchRecord
+            if (!RestoreFromSave())
             {
-                teamA = opponents[(i + 1) % opponents.Length],
-                teamB = opponents[(i + 2) % opponents.Length]
-            });
+                Friendlies = BuildRandomFriendlyOpponents();
+            }
+        }
+    }
+
+    // --- Friendly draw -------------------------------------------------
+
+    private List<FixtureRecord> BuildRandomFriendlyOpponents()
+    {
+        List<NationalTeamData> pool = teamDatabase.teams
+            .Where(team => team != null && team.name != JordanAssetName)
+            .ToList();
+
+        Shuffle(pool);
+
+        List<FixtureRecord> fixtures = new List<FixtureRecord>();
+
+        for (int i = 0; i < FriendlyCount && i < pool.Count; i++)
+        {
+            fixtures.Add(new FixtureRecord { opponent = pool[i] });
         }
 
-        return list;
+        return fixtures;
+    }
+
+    private static void Shuffle<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
     }
 
     public List<FixtureRecord> GetCurrentStageFixtures()
     {
-        return GetFixtureList(Stage);
+        return Stage == CampaignStage.Friendlies ? Friendlies : null;
     }
 
-    private List<FixtureRecord> GetFixtureList(CampaignStage stage)
+    // --- World Cup draw (16 teams, seeded pots, random pairing) --------
+
+    private void GenerateWorldCupDraw()
     {
-        switch (stage)
+        NationalTeamData jordan = teamDatabase.teams.Find(team => team != null && team.name == JordanAssetName);
+
+        HashSet<string> usedNames = Friendlies
+            .Select(fixture => fixture.opponent != null ? fixture.opponent.name : null)
+            .Where(name => name != null)
+            .ToHashSet();
+
+        usedNames.Add(JordanAssetName);
+
+        List<NationalTeamData> candidates = teamDatabase.teams
+            .Where(team => team != null && !usedNames.Contains(team.name))
+            .ToList();
+
+        List<NationalTeamData> drawnOpponents = PickSeededOpponents(candidates, KnockoutTeamCount - 1);
+
+        List<NationalTeamData> fieldOf16 = new List<NationalTeamData> { jordan };
+        fieldOf16.AddRange(drawnOpponents);
+        fieldOf16 = fieldOf16.OrderByDescending(team => team.Overall).ToList();
+
+        List<NationalTeamData> pot1 = fieldOf16.GetRange(0, 4);
+        List<NationalTeamData> pot2 = fieldOf16.GetRange(4, 4);
+        List<NationalTeamData> pot3 = fieldOf16.GetRange(8, 4);
+        List<NationalTeamData> pot4 = fieldOf16.GetRange(12, 4);
+
+        List<BracketMatch> matches = new List<BracketMatch>();
+        matches.AddRange(PairPots(pot1, pot4));
+        matches.AddRange(PairPots(pot2, pot3));
+        Shuffle(matches);
+
+        foreach (BracketMatch match in matches)
         {
-            case CampaignStage.Friendlies: return Friendlies;
-            case CampaignStage.WorldCup: return WorldCup;
-            case CampaignStage.Final: return Final;
-            default: return null;
+            match.isJordanMatch = match.teamA == jordan || match.teamB == jordan;
         }
+
+        Bracket = new List<BracketRound>
+        {
+            new BracketRound { roundName = "Round of 16", matches = matches }
+        };
+
+        WorldCupField = fieldOf16;
+        CurrentBracketRoundIndex = 0;
+        WorldCupDrawRevealShown = false;
+        BracketRecapPending = true;
+        Stage = CampaignStage.WorldCupDrawPending;
+
+        SaveManager.Instance?.SaveCurrentState();
     }
+
+    // Picks `count` opponents from candidates, biased toward spreading
+    // across the full strength range (4 roughly-even tiers by Overall) so
+    // Jordan's World Cup field is not just the globally strongest teams
+    // every campaign, while still being a genuinely random draw each run.
+    private List<NationalTeamData> PickSeededOpponents(List<NationalTeamData> candidates, int count)
+    {
+        List<NationalTeamData> sorted = candidates.OrderByDescending(team => team.Overall).ToList();
+        int tierSize = Mathf.CeilToInt(sorted.Count / 4f);
+
+        List<List<NationalTeamData>> tiers = new List<List<NationalTeamData>>();
+
+        for (int i = 0; i < 4; i++)
+        {
+            int start = Mathf.Min(i * tierSize, sorted.Count);
+            int length = Mathf.Min(tierSize, sorted.Count - start);
+            List<NationalTeamData> tier = length > 0 ? sorted.GetRange(start, length) : new List<NationalTeamData>();
+            Shuffle(tier);
+            tiers.Add(tier);
+        }
+
+        int baseTarget = count / 4;
+        int remainder = count % 4;
+
+        List<NationalTeamData> picked = new List<NationalTeamData>();
+
+        for (int i = 0; i < 4; i++)
+        {
+            int target = baseTarget + (i < remainder ? 1 : 0);
+            int take = Mathf.Min(target, tiers[i].Count);
+            picked.AddRange(tiers[i].Take(take));
+        }
+
+        // If some tiers were too small to hit their target (small pool),
+        // top up from whatever candidates are left, anywhere in the pool.
+        if (picked.Count < count)
+        {
+            List<NationalTeamData> remaining = sorted.Except(picked).ToList();
+            Shuffle(remaining);
+            picked.AddRange(remaining.Take(count - picked.Count));
+        }
+
+        return picked;
+    }
+
+    // Random pairing within two same-size pots: pot4[i] faces pot1[i] in
+    // mirrored order, mirroring the World Cup convention that a team's
+    // first opponent comes from a different (lower) seeding pot, while the
+    // exact pairing is randomized every campaign.
+    private List<BracketMatch> PairPots(List<NationalTeamData> potA, List<NationalTeamData> potB)
+    {
+        List<NationalTeamData> shuffledA = new List<NationalTeamData>(potA);
+        List<NationalTeamData> shuffledB = new List<NationalTeamData>(potB);
+        Shuffle(shuffledA);
+        Shuffle(shuffledB);
+
+        List<BracketMatch> pairs = new List<BracketMatch>();
+
+        for (int i = 0; i < shuffledA.Count && i < shuffledB.Count; i++)
+        {
+            bool swapSides = Random.value < 0.5f;
+
+            pairs.Add(new BracketMatch
+            {
+                teamA = swapSides ? shuffledB[i] : shuffledA[i],
+                teamB = swapSides ? shuffledA[i] : shuffledB[i]
+            });
+        }
+
+        return pairs;
+    }
+
+    // --- Bracket queries -------------------------------------------------
+
+    public BracketRound GetCurrentRound()
+    {
+        return CurrentBracketRoundIndex >= 0 && CurrentBracketRoundIndex < Bracket.Count
+            ? Bracket[CurrentBracketRoundIndex]
+            : null;
+    }
+
+    public BracketMatch GetJordanMatchInCurrentRound()
+    {
+        BracketRound round = GetCurrentRound();
+        return round?.matches.Find(match => match.isJordanMatch);
+    }
+
+    // Used by MatchSetupBuilder to thread Jordan's flag sprite into the
+    // MatchDay preview without every caller needing a database reference.
+    public Sprite GetJordanFlag()
+    {
+        return teamDatabase?.teams.Find(team => team != null && team.name == JordanAssetName)?.flag;
+    }
+
+    // --- Launching matches -----------------------------------------------
 
     public void LaunchFixture(CampaignStage stage, int index)
     {
         launchedStage = stage;
         launchedIndex = index;
 
-        List<FixtureRecord> fixtures = GetFixtureList(stage);
+        List<FixtureRecord> fixtures = GetCurrentStageFixtures();
         NationalTeamData opponent = fixtures[index].opponent;
 
         MatchSession session = MatchSession.GetOrCreate();
         session.SetPendingOpponentTeam(opponent);
-        session.SetPendingIsKnockout(stage == CampaignStage.Final);
+        session.SetPendingIsKnockout(false);
 
+        EnteredFormationFromCampaign = true;
         SceneManager.LoadScene("FormationScene");
     }
 
-    public void RecordResult(int homeScore, int awayScore, bool homeWonOverall)
+    public void LaunchBracketMatch()
+    {
+        BracketMatch jordanMatch = GetJordanMatchInCurrentRound();
+
+        if (jordanMatch == null)
+        {
+            return;
+        }
+
+        launchedStage = Stage;
+        launchedIndex = 0;
+
+        NationalTeamData jordan = teamDatabase.teams.Find(team => team != null && team.name == JordanAssetName);
+        NationalTeamData opponent = jordanMatch.teamA == jordan ? jordanMatch.teamB : jordanMatch.teamA;
+
+        MatchSession session = MatchSession.GetOrCreate();
+        session.SetPendingOpponentTeam(opponent);
+        session.SetPendingIsKnockout(true);
+
+        EnteredFormationFromCampaign = true;
+        SceneManager.LoadScene("FormationScene");
+    }
+
+    // --- Recording results -------------------------------------------------
+
+    public void RecordResult(int homeScore, int awayScore, bool homeWonOverall, int? penaltyHomeScore = null, int? penaltyAwayScore = null)
     {
         if (launchedIndex < 0)
         {
@@ -161,84 +323,281 @@ public class CampaignState : MonoBehaviour
         }
 
         CampaignStage stagePlayed = launchedStage;
-        int indexPlayed = launchedIndex;
+        launchedIndex = -1;
 
-        List<FixtureRecord> fixtures = GetFixtureList(stagePlayed);
-        FixtureRecord fixture = fixtures[indexPlayed];
+        if (stagePlayed == CampaignStage.Friendlies)
+        {
+            RecordFriendlyResult(homeScore, awayScore, homeWonOverall);
+        }
+        else
+        {
+            RecordBracketResult(stagePlayed, homeScore, awayScore, homeWonOverall, penaltyHomeScore, penaltyAwayScore);
+        }
+
+        SaveManager.Instance?.SaveCurrentState();
+    }
+
+    private void RecordFriendlyResult(int homeScore, int awayScore, bool homeWonOverall)
+    {
+        FixtureRecord fixture = Friendlies.Find(f => !f.played);
+
+        if (fixture == null)
+        {
+            return;
+        }
+
         fixture.played = true;
         fixture.homeScore = homeScore;
         fixture.awayScore = awayScore;
 
-        launchedIndex = -1;
+        AwardPoints(CampaignStage.Friendlies, homeScore, awayScore, homeWonOverall);
 
-        if (stagePlayed == CampaignStage.WorldCup)
+        if (Friendlies.TrueForAll(f => f.played))
         {
-            SimulateBackgroundMatchIfNeeded(indexPlayed);
-        }
-
-        if (Stage == CampaignStage.Friendlies && AllPlayed(Friendlies))
-        {
-            Stage = CampaignStage.WorldCup;
-        }
-        else if (Stage == CampaignStage.WorldCup && AllPlayed(WorldCup))
-        {
-            AdvanceFromGroupStage();
-        }
-        else if (Stage == CampaignStage.Final && AllPlayed(Final))
-        {
-            CompletionMessage = homeWonOverall
-                ? "CHAMPIONS! JORDAN WINS THE WORLD CUP FINAL"
-                : "RUNNERS-UP - LOST THE FINAL";
-
-            Stage = CampaignStage.Completed;
+            GenerateWorldCupDraw();
         }
     }
 
-    private void AdvanceFromGroupStage()
+    private void RecordBracketResult(CampaignStage stagePlayed, int homeScore, int awayScore, bool homeWonOverall, int? penaltyHomeScore, int? penaltyAwayScore)
     {
-        List<GroupStandingRow> standings = GetGroupStandings();
-        bool jordanQualifies = standings.Count >= 2 &&
-            (standings[0].teamName == "JORDAN" || standings[1].teamName == "JORDAN");
+        BracketRound round = GetCurrentRound();
+        BracketMatch jordanMatch = round?.matches.Find(m => m.isJordanMatch);
 
-        if (!jordanQualifies)
+        if (jordanMatch == null)
         {
-            CompletionMessage = "ELIMINATED - DID NOT FINISH TOP 2 IN THE GROUP";
-            Stage = CampaignStage.Completed;
             return;
         }
 
-        string otherQualifierName = standings[0].teamName == "JORDAN" ? standings[1].teamName : standings[0].teamName;
-        NationalTeamData finalOpponent = FindOpponentByDisplayName(otherQualifierName);
+        NationalTeamData jordan = teamDatabase.teams.Find(team => team != null && team.name == JordanAssetName);
+        bool jordanIsTeamA = jordanMatch.teamA == jordan;
 
-        Final = new List<FixtureRecord> { new FixtureRecord { opponent = finalOpponent } };
-        Stage = CampaignStage.Final;
-    }
+        jordanMatch.scoreA = jordanIsTeamA ? homeScore : awayScore;
+        jordanMatch.scoreB = jordanIsTeamA ? awayScore : homeScore;
 
-    private NationalTeamData FindOpponentByDisplayName(string displayName)
-    {
-        foreach (NationalTeamData team in worldCupOpponents)
+        // Knockout matches never end level - if regulation/extra time was
+        // level, the actual winner (decided by the live penalty shootout)
+        // is homeWonOverall. Bump the winning side's recorded score by one
+        // so BracketMatch.Winner reflects the real outcome.
+        if (jordanMatch.scoreA == jordanMatch.scoreB)
         {
-            if (DisplayName(team) == displayName)
+            bool jordanWonShootout = homeWonOverall;
+            bool teamAWon = jordanIsTeamA ? jordanWonShootout : !jordanWonShootout;
+
+            if (teamAWon)
             {
-                return team;
+                jordanMatch.scoreA++;
+            }
+            else
+            {
+                jordanMatch.scoreB++;
             }
         }
 
-        return null;
-    }
+        jordanMatch.played = true;
 
-    private void SimulateBackgroundMatchIfNeeded(int matchdayIndex)
-    {
-        GroupMatchRecord match = WorldCupBackgroundMatches[matchdayIndex];
+        if (penaltyHomeScore.HasValue && penaltyAwayScore.HasValue)
+        {
+            jordanMatch.hasPenalties = true;
+            jordanMatch.penaltyScoreA = jordanIsTeamA ? penaltyHomeScore.Value : penaltyAwayScore.Value;
+            jordanMatch.penaltyScoreB = jordanIsTeamA ? penaltyAwayScore.Value : penaltyHomeScore.Value;
+        }
 
-        if (match.played || match.teamA == null || match.teamB == null)
+        AwardPoints(stagePlayed, homeScore, awayScore, homeWonOverall);
+
+        SimulateRoundOtherMatches(round);
+
+        bool jordanAdvanced = jordanMatch.Winner == jordan;
+
+        if (!jordanAdvanced)
+        {
+            CompletionMessage = "ELIMINATED - LOST IN " + round.roundName.ToUpperInvariant();
+            Stage = CampaignStage.Completed;
+            BracketRecapPending = true;
+            return;
+        }
+
+        if (!round.AllPlayed())
         {
             return;
         }
 
-        match.scoreA = SimulateExpectedGoals(match.teamA, match.teamB);
-        match.scoreB = SimulateExpectedGoals(match.teamB, match.teamA);
-        match.played = true;
+        if (stagePlayed == CampaignStage.Final)
+        {
+            CompletionMessage = "CHAMPIONS! JORDAN WINS THE WORLD CUP FINAL";
+            Stage = CampaignStage.Completed;
+            BracketRecapPending = true;
+            return;
+        }
+
+        BuildNextRound(round);
+        BracketRecapPending = true;
+    }
+
+    // Simulates every match in this round that is not Jordan's own match,
+    // using the same rating-based instant-sim formula as before. Ties are
+    // broken by a rating-weighted coin flip so every knockout match has a
+    // clear winner.
+    private void SimulateRoundOtherMatches(BracketRound round)
+    {
+        foreach (BracketMatch match in round.matches)
+        {
+            if (match.isJordanMatch || match.played || match.teamA == null || match.teamB == null)
+            {
+                continue;
+            }
+
+            match.scoreA = SimulateExpectedGoals(match.teamA, match.teamB);
+            match.scoreB = SimulateExpectedGoals(match.teamB, match.teamA);
+
+            if (match.scoreA == match.scoreB)
+            {
+                float oddsForA = match.teamA.Overall / (float)(match.teamA.Overall + match.teamB.Overall);
+
+                if (Random.value < oddsForA)
+                {
+                    match.scoreA++;
+                }
+                else
+                {
+                    match.scoreB++;
+                }
+            }
+
+            match.played = true;
+        }
+    }
+
+    private static readonly string[] NextRoundNames =
+    {
+        "Round of 16", "Quarterfinal", "Semifinal", "Final"
+    };
+
+    private void BuildNextRound(BracketRound completedRound)
+    {
+        List<BracketMatch> nextMatches = new List<BracketMatch>();
+
+        for (int i = 0; i < completedRound.matches.Count; i += 2)
+        {
+            NationalTeamData winnerA = completedRound.matches[i].Winner;
+            NationalTeamData winnerB = completedRound.matches[i + 1].Winner;
+
+            nextMatches.Add(new BracketMatch
+            {
+                teamA = winnerA,
+                teamB = winnerB,
+                isJordanMatch = winnerA != null && winnerA.name == JordanAssetName ||
+                                winnerB != null && winnerB.name == JordanAssetName
+            });
+        }
+
+        CurrentBracketRoundIndex++;
+
+        string nextRoundName = CurrentBracketRoundIndex < NextRoundNames.Length
+            ? NextRoundNames[CurrentBracketRoundIndex]
+            : "Final";
+
+        Bracket.Add(new BracketRound { roundName = nextRoundName, matches = nextMatches });
+
+        Stage = CurrentBracketRoundIndex switch
+        {
+            1 => CampaignStage.Quarterfinal,
+            2 => CampaignStage.Semifinal,
+            _ => CampaignStage.Final
+        };
+    }
+
+    public void MarkDrawRevealShown()
+    {
+        WorldCupDrawRevealShown = true;
+        Stage = CampaignStage.RoundOf16;
+        BracketRecapPending = false;
+        SaveManager.Instance?.SaveCurrentState();
+    }
+
+    public void MarkBracketRecapShown()
+    {
+        BracketRecapPending = false;
+    }
+
+    // Knockout has no group table, so "standings" here means each of the
+    // 16 drawn teams' status: still alive, eliminated in a given round, or
+    // champion - read against the bracket rounds built so far.
+    public string GetTeamStatus(NationalTeamData team)
+    {
+        foreach (BracketRound round in Bracket)
+        {
+            BracketMatch match = round.matches.Find(m => m.teamA == team || m.teamB == team);
+
+            if (match == null)
+            {
+                continue;
+            }
+
+            if (!match.played)
+            {
+                return "STILL IN";
+            }
+
+            if (match.Winner != team)
+            {
+                return "ELIMINATED - " + round.roundName.ToUpperInvariant();
+            }
+
+            if (round.roundName == "Final")
+            {
+                return "CHAMPION";
+            }
+        }
+
+        return "STILL IN";
+    }
+
+    // --- Points -------------------------------------------------------
+
+    private static int BasePointsForStage(CampaignStage stage)
+    {
+        switch (stage)
+        {
+            case CampaignStage.Friendlies: return 5;
+            case CampaignStage.RoundOf16: return 15;
+            case CampaignStage.Quarterfinal: return 25;
+            case CampaignStage.Semifinal: return 40;
+            case CampaignStage.Final: return 60;
+            default: return 5;
+        }
+    }
+
+    private void AwardPoints(CampaignStage stagePlayed, int homeScore, int awayScore, bool homeWonOverall)
+    {
+        if (TrainingManager.Instance == null)
+        {
+            return;
+        }
+
+        int basePoints = BasePointsForStage(stagePlayed);
+
+        bool isFriendly = stagePlayed == CampaignStage.Friendlies;
+        bool isDraw = isFriendly && homeScore == awayScore;
+        bool isWin = isFriendly ? homeScore > awayScore : homeWonOverall;
+
+        int total;
+
+        if (isWin)
+        {
+            int marginBonus = Mathf.Min(10, Mathf.Abs(homeScore - awayScore) * 2);
+            int cleanSheetBonus = awayScore == 0 ? 5 : 0;
+            total = basePoints + marginBonus + cleanSheetBonus;
+        }
+        else if (isDraw)
+        {
+            total = Mathf.RoundToInt(basePoints * 0.4f);
+        }
+        else
+        {
+            total = Mathf.RoundToInt(basePoints * 0.25f);
+        }
+
+        TrainingManager.Instance.AddDevelopmentPoints(total);
     }
 
     private int SimulateExpectedGoals(NationalTeamData attackingTeam, NationalTeamData defendingTeam)
@@ -249,105 +608,117 @@ public class CampaignState : MonoBehaviour
         return Mathf.Clamp(Mathf.RoundToInt(Random.Range(0f, expectedGoals * 2f)), 0, 6);
     }
 
-    public List<GroupStandingRow> GetGroupStandings()
+    // --- Save / restore -------------------------------------------------
+
+    // Returns true if campaign data was found and restored from the save
+    // snapshot, false if there was nothing to restore (brand-new campaign).
+    private bool RestoreFromSave()
     {
-        Dictionary<string, GroupStandingRow> rows = new Dictionary<string, GroupStandingRow>();
+        GameSaveData save = SaveManager.PendingLoadData;
 
-        GroupStandingRow jordanRow = GetOrCreateRow(rows, "JORDAN");
-
-        for (int i = 0; i < WorldCup.Count; i++)
+        if (save == null || string.IsNullOrEmpty(save.campaign.stage))
         {
-            FixtureRecord fixture = WorldCup[i];
-
-            if (!fixture.played)
-            {
-                continue;
-            }
-
-            GroupStandingRow opponentRow = GetOrCreateRow(rows, DisplayName(fixture.opponent));
-            ApplyResult(jordanRow, opponentRow, fixture.homeScore, fixture.awayScore);
+            return false;
         }
 
-        foreach (GroupMatchRecord match in WorldCupBackgroundMatches)
+        CampaignSaveData data = save.campaign;
+
+        Stage = System.Enum.TryParse(data.stage, out CampaignStage parsedStage) ? parsedStage : CampaignStage.Friendlies;
+        CurrentBracketRoundIndex = data.currentBracketRoundIndex;
+        WorldCupDrawRevealShown = data.wcDrawRevealShown;
+        BracketRecapPending = data.bracketRecapPending;
+        CompletionMessage = data.completionMessage;
+
+        Friendlies = data.friendlies.Select(ResolveFixture).ToList();
+        Bracket = data.bracketRounds.Select(ResolveRound).ToList();
+        WorldCupField = data.worldCupFieldNames
+            .Select(teamName => teamDatabase.teams.Find(team => team != null && team.name == teamName))
+            .Where(team => team != null)
+            .ToList();
+
+        // Saves written before WorldCupField existed have no field-of-16
+        // snapshot - rebuild it from the Round of 16 matches so the
+        // standings panel still works for an in-progress campaign.
+        if (WorldCupField.Count == 0 && Bracket.Count > 0)
         {
-            if (!match.played)
-            {
-                continue;
-            }
-
-            GroupStandingRow rowA = GetOrCreateRow(rows, DisplayName(match.teamA));
-            GroupStandingRow rowB = GetOrCreateRow(rows, DisplayName(match.teamB));
-            ApplyResult(rowA, rowB, match.scoreA, match.scoreB);
-        }
-
-        List<GroupStandingRow> standings = new List<GroupStandingRow>(rows.Values);
-        standings.Sort((a, b) =>
-        {
-            if (b.Points != a.Points) return b.Points.CompareTo(a.Points);
-            if (b.GoalDifference != a.GoalDifference) return b.GoalDifference.CompareTo(a.GoalDifference);
-            return b.goalsFor.CompareTo(a.goalsFor);
-        });
-
-        return standings;
-    }
-
-    private GroupStandingRow GetOrCreateRow(Dictionary<string, GroupStandingRow> rows, string teamName)
-    {
-        if (!rows.TryGetValue(teamName, out GroupStandingRow row))
-        {
-            row = new GroupStandingRow { teamName = teamName };
-            rows[teamName] = row;
-        }
-
-        return row;
-    }
-
-    private void ApplyResult(GroupStandingRow rowA, GroupStandingRow rowB, int scoreA, int scoreB)
-    {
-        rowA.played++;
-        rowB.played++;
-        rowA.goalsFor += scoreA;
-        rowA.goalsAgainst += scoreB;
-        rowB.goalsFor += scoreB;
-        rowB.goalsAgainst += scoreA;
-
-        if (scoreA > scoreB)
-        {
-            rowA.wins++;
-            rowB.losses++;
-        }
-        else if (scoreA < scoreB)
-        {
-            rowB.wins++;
-            rowA.losses++;
-        }
-        else
-        {
-            rowA.draws++;
-            rowB.draws++;
-        }
-    }
-
-    private string DisplayName(NationalTeamData team)
-    {
-        if (team == null)
-        {
-            return "?";
-        }
-
-        return string.IsNullOrWhiteSpace(team.teamName) ? team.name.ToUpperInvariant() : team.teamName.ToUpperInvariant();
-    }
-
-    private bool AllPlayed(List<FixtureRecord> fixtures)
-    {
-        foreach (FixtureRecord fixture in fixtures)
-        {
-            if (!fixture.played)
-            {
-                return false;
-            }
+            WorldCupField = Bracket[0].matches
+                .SelectMany(match => new[] { match.teamA, match.teamB })
+                .Where(team => team != null)
+                .ToList();
         }
 
         return true;
+    }
+
+    private FixtureRecord ResolveFixture(FixtureRecordSave saved)
+    {
+        return new FixtureRecord
+        {
+            opponent = teamDatabase.teams.Find(team => team != null && team.name == saved.opponentName),
+            played = saved.played,
+            homeScore = saved.homeScore,
+            awayScore = saved.awayScore
+        };
+    }
+
+    private BracketRound ResolveRound(BracketRoundSave saved)
+    {
+        return new BracketRound
+        {
+            roundName = saved.roundName,
+            matches = saved.matches.Select(ResolveMatch).ToList()
+        };
+    }
+
+    private BracketMatch ResolveMatch(BracketMatchSave saved)
+    {
+        return new BracketMatch
+        {
+            teamA = teamDatabase.teams.Find(team => team != null && team.name == saved.teamAName),
+            teamB = teamDatabase.teams.Find(team => team != null && team.name == saved.teamBName),
+            isJordanMatch = saved.isJordanMatch,
+            played = saved.played,
+            scoreA = saved.scoreA,
+            scoreB = saved.scoreB,
+            hasPenalties = saved.hasPenalties,
+            penaltyScoreA = saved.penaltyScoreA,
+            penaltyScoreB = saved.penaltyScoreB
+        };
+    }
+
+    // Called by SaveManager to fill in this manager's section of the save.
+    public void WriteSaveData(CampaignSaveData data)
+    {
+        data.stage = Stage.ToString();
+        data.currentBracketRoundIndex = CurrentBracketRoundIndex;
+        data.wcDrawRevealShown = WorldCupDrawRevealShown;
+        data.bracketRecapPending = BracketRecapPending;
+        data.completionMessage = CompletionMessage;
+        data.worldCupFieldNames = WorldCupField.Select(team => team.name).ToList();
+
+        data.friendlies = Friendlies.Select(f => new FixtureRecordSave
+        {
+            opponentName = f.opponent != null ? f.opponent.name : "",
+            played = f.played,
+            homeScore = f.homeScore,
+            awayScore = f.awayScore
+        }).ToList();
+
+        data.bracketRounds = Bracket.Select(round => new BracketRoundSave
+        {
+            roundName = round.roundName,
+            matches = round.matches.Select(match => new BracketMatchSave
+            {
+                teamAName = match.teamA != null ? match.teamA.name : "",
+                teamBName = match.teamB != null ? match.teamB.name : "",
+                isJordanMatch = match.isJordanMatch,
+                played = match.played,
+                scoreA = match.scoreA,
+                scoreB = match.scoreB,
+                hasPenalties = match.hasPenalties,
+                penaltyScoreA = match.penaltyScoreA,
+                penaltyScoreB = match.penaltyScoreB
+            }).ToList()
+        }).ToList();
     }
 }
