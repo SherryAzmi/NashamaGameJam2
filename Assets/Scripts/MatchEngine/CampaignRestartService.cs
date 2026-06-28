@@ -2,12 +2,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 // Used when the player has lost the same match twice (their one retry per
-// match was already spent): wipes the save file and every persisted
-// DontDestroyOnLoad singleton so the next scene load starts a completely
-// fresh campaign, then sends the player back to the hub to pick a new squad.
+// match was already spent) or hits "New Career" from Settings: wipes the
+// save file and every persisted DontDestroyOnLoad singleton, then sends the
+// player all the way back to IntroScene - same as a fresh install, including
+// re-entering their coach name (pre-filled with the old one, but editable).
 public static class CampaignRestartService
 {
-    public static void RestartWholeCampaign(string homeSceneName = "HomeScene")
+    public static void RestartWholeCampaign(string targetSceneName = "IntroScene")
     {
         SaveManager.Instance?.DeleteSave();
 
@@ -24,7 +25,7 @@ public static class CampaignRestartService
             GameProgressManager.Instance.ResetTeamProgress();
         }
 
-        SceneManager.LoadScene(homeSceneName);
+        SceneManager.LoadScene(targetSceneName);
     }
 
     private static void DestroyIfExists(GameObject target)

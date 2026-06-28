@@ -59,14 +59,15 @@ public class TrainingManager : MonoBehaviour
 
     public bool HasCollectiveTraining => collectiveJob != null;
 
+    // currentGameHour itself still ticks exactly the same way and still
+    // drives every training duration/cooldown - only the "Day X" calendar
+    // framing is gone from the displayed label.
     public string CurrentTimeLabel
     {
         get
         {
-            int day = (currentGameHour / 24) + 1;
             int hour = currentGameHour % 24;
-
-            return "Day " + day + " - " + hour.ToString("00") + ":00";
+            return hour.ToString("00") + ":00";
         }
     }
 

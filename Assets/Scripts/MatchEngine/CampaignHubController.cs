@@ -32,6 +32,12 @@ public class CampaignHubController : MonoBehaviour
     public GameObject completionPanel;
     public TMP_Text completionText;
 
+    // Whichever play button is currently serving its 2-minute post-match
+    // cooldown, so Update() can count it down and re-enable it at zero.
+    private Button lockedButton;
+    private TMP_Text lockedButtonLabel;
+    private string lockedButtonOriginalText;
+
     private void Start()
     {
         if (viewBracketButton != null)
@@ -50,6 +56,56 @@ public class CampaignHubController : MonoBehaviour
     private Button GetComponentForButton(GameObject buttonObject)
     {
         return buttonObject.GetComponent<Button>();
+    }
+
+    private void Update()
+    {
+        if (lockedButton == null)
+        {
+            return;
+        }
+
+        CampaignState state = CampaignState.Instance;
+        float remaining = state != null ? state.NextFixtureUnlockTime - Time.realtimeSinceStartup : 0f;
+
+        if (remaining <= 0f)
+        {
+            lockedButton.interactable = true;
+
+            if (lockedButtonLabel != null && lockedButtonOriginalText != null)
+            {
+                lockedButtonLabel.text = lockedButtonOriginalText;
+            }
+
+            lockedButton = null;
+            return;
+        }
+
+        if (lockedButtonLabel != null)
+        {
+            int totalSeconds = Mathf.CeilToInt(remaining);
+            lockedButtonLabel.text = "LOCKED " + (totalSeconds / 60) + ":" + (totalSeconds % 60).ToString("00");
+        }
+    }
+
+    // Hard-locks a just-revealed "Play" button behind the post-match
+    // cooldown, counting down right inside the button itself, instead of
+    // letting the manager queue up the next match instantly.
+    private void ApplyFixtureLockIfNeeded(Button button)
+    {
+        CampaignState state = CampaignState.Instance;
+        float remaining = state != null ? state.NextFixtureUnlockTime - Time.realtimeSinceStartup : 0f;
+
+        if (remaining <= 0f)
+        {
+            button.interactable = true;
+            return;
+        }
+
+        button.interactable = false;
+        lockedButton = button;
+        lockedButtonLabel = button.GetComponentInChildren<TMP_Text>();
+        lockedButtonOriginalText = lockedButtonLabel != null ? lockedButtonLabel.text : null;
     }
 
     private void ShowBracketOnDemand()
@@ -177,6 +233,7 @@ public class CampaignHubController : MonoBehaviour
 
                 fixturePlayButtons[i].onClick.RemoveAllListeners();
                 fixturePlayButtons[i].onClick.AddListener(() => state.LaunchFixture(CampaignStage.Friendlies, capturedIndex));
+                ApplyFixtureLockIfNeeded(fixturePlayButtons[i]);
             }
         }
     }
@@ -214,6 +271,7 @@ public class CampaignHubController : MonoBehaviour
         {
             fixturePlayButtons[0].onClick.RemoveAllListeners();
             fixturePlayButtons[0].onClick.AddListener(state.LaunchBracketMatch);
+            ApplyFixtureLockIfNeeded(fixturePlayButtons[0]);
         }
     }
 

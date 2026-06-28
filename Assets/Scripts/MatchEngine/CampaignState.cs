@@ -315,6 +315,12 @@ public class CampaignState : MonoBehaviour
 
     // --- Recording results -------------------------------------------------
 
+    // Real-time (not saved/persisted across app restarts - just an
+    // in-session anti-spam cooldown) timestamp before which the next
+    // fixture's Play button stays locked. Read by CampaignHubController.
+    private const float NextFixtureCooldownSeconds = 120f;
+    public float NextFixtureUnlockTime { get; private set; }
+
     public void RecordResult(int homeScore, int awayScore, bool homeWonOverall, int? penaltyHomeScore = null, int? penaltyAwayScore = null)
     {
         if (launchedIndex < 0)
@@ -333,6 +339,8 @@ public class CampaignState : MonoBehaviour
         {
             RecordBracketResult(stagePlayed, homeScore, awayScore, homeWonOverall, penaltyHomeScore, penaltyAwayScore);
         }
+
+        NextFixtureUnlockTime = Time.realtimeSinceStartup + NextFixtureCooldownSeconds;
 
         SaveManager.Instance?.SaveCurrentState();
     }

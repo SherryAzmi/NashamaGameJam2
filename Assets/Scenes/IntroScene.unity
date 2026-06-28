@@ -312,7 +312,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 2147483647
   m_IsActive: 1
 --- !u!114 &1022669297
 MonoBehaviour:
@@ -326,12 +326,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c73e2ea38efe46848804821f5cd4c6d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  clickSfx: {fileID: 0}
-  jordanGoalSfx: {fileID: 0}
-  opponentGoalSfx: {fileID: 0}
-  trainingSfx: {fileID: 0}
-  musicTracks: []
-  decisiveActionSounds: []
+  clickSfx: {fileID: 8300000, guid: ca10c8f5b6d38ec499555324b01c9163, type: 3}
+  jordanGoalSfx: {fileID: 8300000, guid: 2c37cf1690e9e644ca20aa801d1b9590, type: 3}
+  opponentGoalSfx: {fileID: 8300000, guid: 2c37cf1690e9e644ca20aa801d1b9590, type: 3}
+  trainingSfx: {fileID: 8300000, guid: 22f8de311ae36314d915a4679d8a1544, type: 3}
+  musicTracks:
+  - trackName: Men Janobek Men Shamalek
+    clip: {fileID: 8300000, guid: 27e2c0f749f2cc74e8a15973c5fbe4f8, type: 3}
+  - trackName: Haregah
+    clip: {fileID: 8300000, guid: c72e16c029a618e46b437dff3fb37891, type: 3}
+  - trackName: Hez Al Malaab
+    clip: {fileID: 8300000, guid: 402bdd22361ffb34d82aa0db0bfb8dd5, type: 3}
+  - trackName: Dayman Ma3ak
+    clip: {fileID: 8300000, guid: 0411d7b4c94459840af92c856a712640, type: 3}
+  decisiveActionSounds:
+  - action: 0
+    clip: {fileID: 8300000, guid: 29c3963b08f963442af28a090da049ef, type: 3}
+  - action: 1
+    clip: {fileID: 8300000, guid: 2b32790fc44a97e47b3302f1b3b00220, type: 3}
+  - action: 2
+    clip: {fileID: 8300000, guid: 0b1ebdf8ef3d59a47bb7cd9cc925d77f, type: 3}
+  - action: 3
+    clip: {fileID: 8300000, guid: bec9946c2a5101b4694a050da033d1b7, type: 3}
+  - action: 4
+    clip: {fileID: 8300000, guid: 01faa542c9eb7aa469df6a5bc907c356, type: 3}
+  - action: 5
+    clip: {fileID: 8300000, guid: bb79ad83ba38da244a21900be85e7616, type: 3}
+  - action: 6
+    clip: {fileID: 8300000, guid: 814010e8d07e97e4cbdae1a084ecd537, type: 3}
+  - action: 7
+    clip: {fileID: 8300000, guid: a24407875cec00f46a3657b6511f84c5, type: 3}
+  - action: 8
+    clip: {fileID: 8300000, guid: 66255acac3c40f548a5b18d9a0621fb9, type: 3}
 --- !u!4 &1022669298
 Transform:
   m_ObjectHideFlags: 0
@@ -1332,62 +1358,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerNameInput: {fileID: 1844389602}
---- !u!1 &2048045834
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2048045836}
-  - component: {fileID: 2048045835}
-  m_Layer: 0
-  m_Name: AudioManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2048045835
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2048045834}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c73e2ea38efe46848804821f5cd4c6d5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  clickSfx: {fileID: 0}
-  jordanGoalSfx: {fileID: 0}
-  opponentGoalSfx: {fileID: 0}
-  trainingSfx: {fileID: 0}
-  musicTracks:
-  - trackName: 
-    clip: {fileID: 0}
-  decisiveActionSounds:
-  - action: 0
-    clip: {fileID: 0}
-  - action: 0
-    clip: {fileID: 0}
---- !u!4 &2048045836
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2048045834}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -227.61931, y: 1400.7101, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1396,5 +1366,4 @@ SceneRoots:
   - {fileID: 41899885}
   - {fileID: 1437297319}
   - {fileID: 1136116215}
-  - {fileID: 2048045836}
   - {fileID: 1022669298}

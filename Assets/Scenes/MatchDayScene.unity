@@ -1362,8 +1362,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.02, y: 0}
   m_AnchorMax: {x: 0.35, y: 0.26}
-  m_AnchoredPosition: {x: 128.26599, y: 162.70398}
-  m_SizeDelta: {x: 238.78802, y: 369.40802}
+  m_AnchoredPosition: {x: 112.75189, y: 182.35516}
+  m_SizeDelta: {x: 207.7598, y: 330.1056}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &309591850
 CanvasRenderer:
@@ -1422,10 +1422,10 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 34
+  m_fontSize: 72
   m_fontSizeBase: 34
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
@@ -2784,8 +2784,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.65, y: 0}
   m_AnchorMax: {x: 0.98, y: 0.26}
-  m_AnchoredPosition: {x: -112.26599, y: 184.70398}
-  m_SizeDelta: {x: 238.788, y: 369.408}
+  m_AnchoredPosition: {x: -115.83002, y: 194.01245}
+  m_SizeDelta: {x: 231.66, y: 350.791}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &969389292
 CanvasRenderer:
@@ -2844,10 +2844,10 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 35
+  m_fontSize: 72
   m_fontSizeBase: 35
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 1
@@ -3418,6 +3418,10 @@ MonoBehaviour:
   resultText: {fileID: 1199198554}
   continueButton: {fileID: 1854324613}
   campaignSceneName: CampaignScene
+  retryButton: {fileID: 0}
+  restartCampaignButton: {fileID: 0}
+  retryInfoText: {fileID: 0}
+  retryConsolationPoints: 20
   pitchController: {fileID: 1026888082}
   playbackController: {fileID: 1026888083}
   decisiveMomentController: {fileID: 1026888085}
@@ -3450,6 +3454,8 @@ MonoBehaviour:
   pressStrength: 0.5
   shakeDuration: 0.35
   shakeStrength: 18
+  passRange: 7
+  passCandidateCount: 6
 --- !u!114 &1026888083
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3495,6 +3501,8 @@ MonoBehaviour:
   maxIntervalSeconds: 16
   slowMotionScale: 0.3
   resultPopupDuration: 1.6
+  dangerZoneProgress: 0.78
+  minimumMomentCooldown: 4
   decisivePanel: {fileID: 1793560658}
   contextText: {fileID: 869214325}
   option1Button: {fileID: 1525972914}
@@ -5336,7 +5344,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1616565989
 RectTransform:
   m_ObjectHideFlags: 0
