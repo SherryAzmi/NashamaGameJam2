@@ -81,13 +81,12 @@ public static class MatchDecisiveMomentResolver
     private static DecisiveMomentOutcome ResolveDefense(DecisiveMoment moment, DecisiveAction action)
     {
         DecisiveMomentOutcome outcome = new DecisiveMomentOutcome { action = action };
-        PlayerData threat = moment.opponent;
 
         switch (action)
         {
             case DecisiveAction.Tackle:
             {
-                float chance = TackleChance(moment, threat);
+                float chance = TackleChance(moment);
                 outcome.success = Roll(chance);
                 outcome.possessionTurnover = outcome.success;
                 outcome.bonusPoints = outcome.success ? 8 : 0;
@@ -97,7 +96,7 @@ public static class MatchDecisiveMomentResolver
 
             case DecisiveAction.Block:
             {
-                float chance = BlockChance(moment, threat);
+                float chance = BlockChance(moment);
                 outcome.success = Roll(chance);
                 outcome.isGoal = !outcome.success;
                 outcome.bonusPoints = outcome.success ? 8 : 0;
@@ -107,7 +106,7 @@ public static class MatchDecisiveMomentResolver
 
             case DecisiveAction.Press:
             {
-                float chance = PressChance(moment, threat);
+                float chance = PressChance(moment);
                 outcome.success = Roll(chance);
                 outcome.possessionTurnover = outcome.success;
                 outcome.bonusPoints = outcome.success ? 6 : 0;
@@ -117,7 +116,7 @@ public static class MatchDecisiveMomentResolver
 
             case DecisiveAction.Cover:
             {
-                float chance = CoverChance(moment, threat);
+                float chance = CoverChance(moment);
                 outcome.success = Roll(chance);
                 outcome.possessionTurnover = false;
                 outcome.bonusPoints = outcome.success ? 4 : 0;
@@ -140,10 +139,10 @@ public static class MatchDecisiveMomentResolver
             case DecisiveAction.Dribble: return DribbleChance(moment);
             case DecisiveAction.ThroughBall: return ThroughBallChance(moment);
             case DecisiveAction.LongBall: return LongBallChance(moment);
-            case DecisiveAction.Tackle: return TackleChance(moment, moment.opponent);
-            case DecisiveAction.Block: return BlockChance(moment, moment.opponent);
-            case DecisiveAction.Press: return PressChance(moment, moment.opponent);
-            case DecisiveAction.Cover: return CoverChance(moment, moment.opponent);
+            case DecisiveAction.Tackle: return TackleChance(moment);
+            case DecisiveAction.Block: return BlockChance(moment);
+            case DecisiveAction.Press: return PressChance(moment);
+            case DecisiveAction.Cover: return CoverChance(moment);
         }
 
         return 0.5f;
@@ -157,7 +156,7 @@ public static class MatchDecisiveMomentResolver
     // very next Shoot like before.
     private static float ShootChance(DecisiveMoment moment)
     {
-        float keeperDefense = (moment.opponent != null ? moment.opponent.defense : 50f) * moment.difficultyMultiplier;
+        float keeperDefense = moment.opponentTeamDefenseRating * moment.difficultyMultiplier;
         float defenderPenalty = moment.nearbyDefenderCount * 7f;
         float basePercent = Mathf.Lerp(0.14f, 0.42f, moment.fieldProgress);
 
@@ -166,7 +165,7 @@ public static class MatchDecisiveMomentResolver
 
     private static float PassChance(DecisiveMoment moment)
     {
-        return Chance(0.45f, moment.actor.speed, 50f * moment.difficultyMultiplier, moment.attackBoost);
+        return Chance(0.45f, moment.actor.speed, moment.opponentTeamMidfieldRating * moment.difficultyMultiplier, moment.attackBoost);
     }
 
     // More defenders crowding the ball carrier makes beating "a defender"
@@ -198,49 +197,56 @@ public static class MatchDecisiveMomentResolver
     // carrier right now since it's going over their heads.
     private static float LongBallChance(DecisiveMoment moment)
     {
-        return Chance(0.4f, moment.actor.speed, 55f * moment.difficultyMultiplier, moment.attackBoost);
+        return Chance(0.4f, moment.actor.speed, moment.opponentTeamDefenseRating * moment.difficultyMultiplier, moment.attackBoost);
     }
 
     // Extra defenders already converging on the ball help the tackle.
-    private static float TackleChance(DecisiveMoment moment, PlayerData threat)
+    // The threat's PlayerData is only used for display (who's on the
+    // ball); the actual difficulty comes from the enemy team's overall
+    // midfield rating - your team's odds are per-player, theirs are
+    // team-wide, per design.
+    private static float TackleChance(DecisiveMoment moment)
     {
         float supportBonus = moment.nearbyDefenderCount * 4f;
 
-        return Chance(0.35f, moment.actor.defense + supportBonus, threat.speed * moment.difficultyMultiplier, 1f);
+        return Chance(0.35f, moment.actor.defense + supportBonus, moment.opponentTeamMidfieldRating * moment.difficultyMultiplier, 1f);
     }
 
     // The deeper the threat already is into the box, the harder the block.
-    private static float BlockChance(DecisiveMoment moment, PlayerData threat)
+    private static float BlockChance(DecisiveMoment moment)
     {
         float dangerPenalty = moment.fieldProgress * 12f;
 
-        return Chance(0.4f, moment.actor.defense, threat.shoot * moment.difficultyMultiplier + dangerPenalty, 1f);
+        return Chance(0.4f, moment.actor.defense, moment.opponentTeamAttackRating * moment.difficultyMultiplier + dangerPenalty, 1f);
     }
 
-    private static float PressChance(DecisiveMoment moment, PlayerData threat)
+    private static float PressChance(DecisiveMoment moment)
     {
         float supportBonus = moment.nearbyDefenderCount * 3f;
 
-        return Chance(0.4f, moment.actor.speed + supportBonus, threat.speed * moment.difficultyMultiplier, 1f);
+        return Chance(0.4f, moment.actor.speed + supportBonus, moment.opponentTeamMidfieldRating * moment.difficultyMultiplier, 1f);
     }
 
     // The safe option for an isolated defender: easier than a Tackle (no
     // real risk of being skinned outright), but it only contains the
     // threat rather than winning the ball back.
-    private static float CoverChance(DecisiveMoment moment, PlayerData threat)
+    private static float CoverChance(DecisiveMoment moment)
     {
-        return Chance(0.5f, moment.actor.defense, threat.speed * moment.difficultyMultiplier, 1f);
+        return Chance(0.5f, moment.actor.defense, moment.opponentTeamMidfieldRating * moment.difficultyMultiplier, 1f);
     }
 
     // favorStat/againstStat drive the base stat-vs-stat swing; momentum is
     // a separate flat bonus (only attack actions pass anything but 1f) so
-    // a hot streak always helps regardless of which way the raw stats lean
-    // - previously this scaled the stat differential itself, which could
-    // make momentum backfire when the underlying stat matchup was unfavorable.
+    // a hot streak always helps regardless of which way the raw stats lean.
+    // favorStat (always the player's/team's own side taking the action) is
+    // weighted higher than againstStat on purpose - a slight house lean
+    // toward whoever's acting, so a good stat on your side counts for more
+    // than the same gap counts against you, making the game a bit easier
+    // overall without flattening the stat-vs-stat feel.
     private static float Chance(float basePercent, float favorStat, float againstStat, float momentum)
     {
-        float chance = basePercent + (favorStat - againstStat) * 0.006f + (momentum - 1f) * 0.18f;
-        return Mathf.Clamp(chance, 0.08f, 0.92f);
+        float chance = basePercent + favorStat * 0.018f - againstStat * 0.011f + (momentum - 1f) * 0.18f;
+        return Mathf.Clamp(chance, 0.05f, 0.95f);
     }
 
     private static bool Roll(float chance)

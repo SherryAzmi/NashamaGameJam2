@@ -205,7 +205,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
                 : PickWeightedCarrier(setup.home.startingEleven);
             PlayerData opponentGoalkeeper = FindGoalkeeper(setup.away.startingEleven, "4-3-3");
 
-            currentMoment = new DecisiveMoment(DecisiveMomentType.Attack, carrier, opponentGoalkeeper, setup.away.defense)
+            currentMoment = new DecisiveMoment(DecisiveMomentType.Attack, carrier, opponentGoalkeeper, setup.away.attack, setup.away.midfield, setup.away.defense)
             {
                 attackBoost = attackBoost,
                 difficultyMultiplier = difficultyMultiplier,
@@ -222,7 +222,7 @@ public class MatchDecisiveMomentController : MonoBehaviour
                 : PickWeightedCarrier(setup.away.startingEleven);
             PlayerData defender = PickDefender(setup.home.startingEleven, setup.home.formation);
 
-            currentMoment = new DecisiveMoment(DecisiveMomentType.Defense, defender, threat, setup.away.defense)
+            currentMoment = new DecisiveMoment(DecisiveMomentType.Defense, defender, threat, setup.away.attack, setup.away.midfield, setup.away.defense)
             {
                 difficultyMultiplier = difficultyMultiplier,
                 fieldProgress = fieldProgress,

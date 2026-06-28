@@ -53,10 +53,17 @@ public class MatchDayController : MonoBehaviour
     [Header("Lose / Retry")]
     [Tooltip("Shown only right after a loss, and only if the retry for this match hasn't been used yet.")]
     public Button retryButton;
-    [Tooltip("Shown only after losing the SAME match a second time (the one retry already used) - wipes the whole campaign and sends the player back to squad selection.")]
-    public Button restartCampaignButton;
     public TMP_Text retryInfoText;
     public int retryConsolationPoints = 20;
+
+    [Header("Campaign-ending panel (won the Final, or lost the same match twice)")]
+    [Tooltip("Replaces the normal result panel for the two campaign-ending outcomes: becoming champion, or losing one match twice in a row.")]
+    public GameObject campaignEndPanel;
+    public TMP_Text campaignEndText;
+    public Button campaignEndNewCareerButton;
+    [Tooltip("Only shown after winning the Final - hidden on the forced-restart loss panel so the player can't just go Home and play this match a 3rd time.")]
+    public Button campaignEndHomeButton;
+    public Button campaignEndExitButton;
 
     [Header("Systems")]
     public MatchPitchController pitchController;
@@ -114,10 +121,22 @@ public class MatchDayController : MonoBehaviour
             retryButton.onClick.AddListener(RetryMatch);
         }
 
-        if (restartCampaignButton != null)
+        if (campaignEndNewCareerButton != null)
         {
-            restartCampaignButton.onClick.RemoveAllListeners();
-            restartCampaignButton.onClick.AddListener(() => CampaignRestartService.RestartWholeCampaign());
+            campaignEndNewCareerButton.onClick.RemoveAllListeners();
+            campaignEndNewCareerButton.onClick.AddListener(() => CampaignRestartService.RestartWholeCampaign());
+        }
+
+        if (campaignEndHomeButton != null)
+        {
+            campaignEndHomeButton.onClick.RemoveAllListeners();
+            campaignEndHomeButton.onClick.AddListener(GoHome);
+        }
+
+        if (campaignEndExitButton != null)
+        {
+            campaignEndExitButton.onClick.RemoveAllListeners();
+            campaignEndExitButton.onClick.AddListener(ExitGame);
         }
 
         editFormationButton.onClick.RemoveAllListeners();
@@ -178,6 +197,11 @@ public class MatchDayController : MonoBehaviour
         matchHud.SetActive(false);
         resultPanel.SetActive(false);
 
+        if (campaignEndPanel != null)
+        {
+            campaignEndPanel.SetActive(false);
+        }
+
         homeFormationText.text = "JORDAN\n" + setup.home.formation;
         awayFormationText.text = setup.away.teamName.ToUpperInvariant() + "\n" + setup.away.formation;
 
@@ -227,6 +251,11 @@ public class MatchDayController : MonoBehaviour
         previewPanel.SetActive(false);
         matchHud.SetActive(true);
         resultPanel.SetActive(false);
+
+        if (campaignEndPanel != null)
+        {
+            campaignEndPanel.SetActive(false);
+        }
 
         homeScore = 0;
         awayScore = 0;
@@ -378,18 +407,46 @@ public class MatchDayController : MonoBehaviour
 
     private void ShowFullTimeResult(string penaltyLine)
     {
-        resultPanel.SetActive(true);
-
         string motmName = FindManOfTheMatch();
+        string scoreLine = $"JORDAN {homeScore} - {awayScore} {setup.away.teamName.ToUpperInvariant()}{penaltyLine}";
+
+        if (DidJordanWinTheFinal())
+        {
+            // The Final has no "continue to campaign" step left to play, so
+            // the result has to be recorded right here instead of waiting
+            // for a Continue button that this panel never shows.
+            if (CampaignState.Instance != null)
+            {
+                CampaignState.Instance.RecordResult(homeScore, awayScore, true, penaltyHomeScore, penaltyAwayScore);
+            }
+
+            ShowCampaignEndPanel(
+                $"CONGRATULATIONS!\n\n{scoreLine}\n\nMAN OF THE MATCH: {motmName}\n\nJORDAN ARE WORLD CHAMPIONS!",
+                showHome: true);
+            return;
+        }
+
+        resultPanel.SetActive(true);
 
         // Bonus points are tracked (decisiveMomentController.TotalBonusPoints)
         // but intentionally not shown here - the points system is being
         // rebuilt separately and will hook into that value once ready.
-        resultText.text =
-            $"FULL TIME\n\nJORDAN {homeScore} - {awayScore} {setup.away.teamName.ToUpperInvariant()}{penaltyLine}\n\n" +
-            $"MAN OF THE MATCH: {motmName}";
+        resultText.text = $"FULL TIME\n\n{scoreLine}\n\nMAN OF THE MATCH: {motmName}";
 
         UpdateLoseRetryUi();
+    }
+
+    // Only the Final ever ends a winning campaign outright - every earlier
+    // round just advances to the next one via the normal Continue button.
+    private bool DidJordanWinTheFinal()
+    {
+        if (!isKnockoutMatch || CampaignState.Instance == null || CampaignState.Instance.Stage != CampaignStage.Final)
+        {
+            return false;
+        }
+
+        bool homeWon = penaltyHomeWon ?? (homeScore > awayScore);
+        return homeWon;
     }
 
     // A draw only counts as a loss in a knockout match (it always resolves
@@ -409,36 +466,67 @@ public class MatchDayController : MonoBehaviour
         bool canRetry = jordanLost && lossAttemptsThisMatch == 0;
         bool mustRestartCampaign = jordanLost && lossAttemptsThisMatch >= 1;
 
+        if (mustRestartCampaign)
+        {
+            // No retry left and no Continue - New Career or Exit only, so
+            // the player can't keep replaying this same match a 3rd time.
+            ShowCampaignEndPanel(
+                "GOOD LUCK NEXT TIME!\n\nYOU LOST THIS MATCH TWICE IN A ROW - THE WHOLE CAMPAIGN MUST RESTART.",
+                showHome: false);
+            return;
+        }
+
         if (retryButton != null)
         {
             retryButton.gameObject.SetActive(canRetry);
         }
 
-        if (restartCampaignButton != null)
-        {
-            restartCampaignButton.gameObject.SetActive(mustRestartCampaign);
-        }
-
         if (continueButton != null)
         {
-            continueButton.gameObject.SetActive(!mustRestartCampaign);
+            continueButton.gameObject.SetActive(true);
         }
 
         if (retryInfoText != null)
         {
-            if (mustRestartCampaign)
-            {
-                retryInfoText.text = "YOU LOST THIS MATCH TWICE - THE WHOLE CAMPAIGN MUST RESTART.";
-            }
-            else if (canRetry)
-            {
-                retryInfoText.text = $"YOU LOST. RETRY THIS MATCH FOR +{retryConsolationPoints} DEVELOPMENT POINTS, OR CONTINUE TO ACCEPT THE RESULT.";
-            }
-            else
-            {
-                retryInfoText.text = "";
-            }
+            retryInfoText.text = canRetry
+                ? $"YOU LOST. RETRY THIS MATCH FOR +{retryConsolationPoints} DEVELOPMENT POINTS, OR CONTINUE TO ACCEPT THE RESULT."
+                : "";
         }
+    }
+
+    private void ShowCampaignEndPanel(string message, bool showHome)
+    {
+        if (campaignEndPanel == null)
+        {
+            return;
+        }
+
+        resultPanel.SetActive(false);
+        campaignEndPanel.SetActive(true);
+
+        if (campaignEndText != null)
+        {
+            campaignEndText.text = message;
+        }
+
+        if (campaignEndHomeButton != null)
+        {
+            campaignEndHomeButton.gameObject.SetActive(showHome);
+        }
+    }
+
+    private void GoHome()
+    {
+        SceneManager.LoadScene("HomeScene");
+    }
+
+    private void ExitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     // Replays this exact fixture from kickoff - same opponent, no campaign

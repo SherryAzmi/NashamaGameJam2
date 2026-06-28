@@ -34,8 +34,13 @@ public class DecisiveMoment
     // attacking threat itself on Defense.
     public PlayerData opponent;
 
-    // Opponent team's overall defense rating, used for the Attack-Dribble
-    // check (beating "a defender" in the abstract, not one specific player).
+    // Opponent team's overall ratings. The enemy team's effect on every
+    // chance roll comes from these team-wide numbers (not a specific
+    // synthesized player), per design: your team's odds are driven by
+    // whichever of your own players is on the ball, the enemy's odds are
+    // driven by their team as a whole.
+    public int opponentTeamAttackRating;
+    public int opponentTeamMidfieldRating;
     public int opponentTeamDefenseRating;
 
     public float attackBoost = 1f;
@@ -53,11 +58,13 @@ public class DecisiveMoment
     // makes the opponent tougher (Hard), <1 makes them easier (Easy).
     public float difficultyMultiplier = 1f;
 
-    public DecisiveMoment(DecisiveMomentType type, PlayerData actor, PlayerData opponent, int opponentTeamDefenseRating)
+    public DecisiveMoment(DecisiveMomentType type, PlayerData actor, PlayerData opponent, int opponentTeamAttackRating, int opponentTeamMidfieldRating, int opponentTeamDefenseRating)
     {
         this.type = type;
         this.actor = actor;
         this.opponent = opponent;
+        this.opponentTeamAttackRating = opponentTeamAttackRating;
+        this.opponentTeamMidfieldRating = opponentTeamMidfieldRating;
         this.opponentTeamDefenseRating = opponentTeamDefenseRating;
     }
 }
